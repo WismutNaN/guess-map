@@ -118,7 +118,45 @@ User toggle → React LayerPanel → MapLibre setLayoutProperty(visibility)
   → Мгновенное включение/выключение (данные уже загружены)
 ```
 
-## 6. Принципы архитектуры
+## 6. Конкурентный доступ к SQLite
+
+UI (Tauri IPC) и Agent API (HTTP-сервер) работают с одной БД одновременно. Стратегия:
+
+1. **WAL mode** — включается при инициализации: `PRAGMA journal_mode=WAL`. Позволяет одновременные чтения и один параллельный писатель без блокировки читателей.
+2. **Единый connection pool** — Rust-сторона владеет пулом соединений (`r2d2` или `deadpool`). И IPC commands, и AgentServer используют один пул.
+3. **Транзакции** — batch-операции (Agent API `POST /hints/batch`) выполняются в одной транзакции. При ошибке — rollback всей транзакции (атомарность).
+4. **Busy timeout** — `PRAGMA busy_timeout=5000`. Если БД заблокирована, ожидание до 5 секунд вместо немедленной ошибки.
+
+## 7. Экспорт и импорт базы знаний
+
+### 7.1. Экспорт
+
+Формат: ZIP-архив со структурой:
+
+```
+guessmap-export-2026-03-26.zip
+├── data.json          # все hint_type, region_hint, привязки
+├── settings.json      # пользовательские hint_type (не builtin)
+├── assets/            # все изображения
+│   ├── flags/
+│   ├── samples/
+│   └── icons/
+└── manifest.json      # версия формата, дата, статистика
+```
+
+### 7.2. Импорт
+
+Режимы:
+- **Merge** — добавить новые, обновить существующие (по region_id + hint_type_code)
+- **Replace** — полная замена всех подсказок
+- **Selective** — пользователь выбирает, какие hint_type импортировать
+
+### 7.3. Agent API endpoints
+
+- `GET /api/export` — скачать ZIP-архив базы знаний
+- `POST /api/import` — загрузить ZIP-архив (multipart/form-data), query param `mode=merge|replace`
+
+## 8. Принципы архитектуры
 
 1. **Viewer-first** — границы не редактируются, только атрибуты и привязки
 2. **Extensible hints** — новые типы подсказок добавляются через данные, без изменения схемы (см. [Hint System](hint-system.md))

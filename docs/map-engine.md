@@ -18,16 +18,60 @@ MapLibre оперирует понятием **source** (источник дан
 | `hints-{hint_type_code}` | geojson | Точки подсказок по типу | Compiled из SQLite |
 | `cities` | geojson | Населённые пункты | Natural Earth populated places |
 
-### 2.2. Обновление источников
+### 2.2. Стратегия компиляции: GeoJSON ↔ SQLite
 
-При изменении данных (через UI или Agent API):
+Подсказки хранятся в SQLite, но MapLibre работает с GeoJSON/vector sources. Компиляция — это процесс создания GeoJSON из данных БД.
 
-1. Rust LayerCompiler собирает GeoJSON из SQLite для затронутого `hint_type`
-2. Отправляет через IPC event `layer:updated` с payload `{source_id, geojson}`
+#### Два типа compiled sources:
+
+**Point sources (`hints-{code}`)** — для `icon`, `text`, `image`, `composite` display families:
+
+```
+LayerCompiler выполняет:
+  SELECT rh.*, r.anchor_lng, r.anchor_lat, r.name, r.country_code
+  FROM region_hint rh
+  JOIN region r ON rh.region_id = r.id
+  WHERE rh.hint_type_id = :type_id AND rh.is_visible = 1
+
+  → Для каждой строки создаёт GeoJSON Point Feature:
+    {
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [anchor_lng, anchor_lat] },
+      properties: {
+        id, region_id, short_value, full_value, color,
+        icon_asset, min_zoom, max_zoom, priority, confidence,
+        ...data_json (flattened)
+      }
+    }
+```
+
+**Polygon enrichment (`regions-countries`, `regions-admin1`)** — для `polygon_fill`:
+
+```
+LayerCompiler НЕ создаёт новый GeoJSON.
+Вместо этого обогащает properties существующих polygon features:
+
+1. Загружает bundled GeoJSON с геометриями регионов
+2. Для каждого feature находит region_hint по geometry_ref → region_id
+3. Добавляет hint properties в feature.properties:
+   feature.properties.driving_side = "left"
+   feature.properties.coverage_provider = "Google"
+4. Сохраняет enriched GeoJSON
+
+Enrichment запускается при:
+  - Старте приложения
+  - Изменении hint с display_family = "polygon_fill"
+  - Команде layer::compile
+```
+
+#### Обновление в реальном времени:
+
+1. При изменении hint — LayerCompiler пересобирает GeoJSON для затронутого `hint_type`
+2. Отправляет IPC event `layer:updated` с payload `{source_id, geojson}`
 3. React MapView вызывает `map.getSource(id).setData(geojson)`
 4. MapLibre перерисовывает затронутые слои
 
-Для больших наборов данных используется PMTiles вместо GeoJSON.
+Для point sources (~200 стран, ~4500 admin1) GeoJSON достаточно. PMTiles используется только для basemap и bundled region geometries.
 
 ## 3. Структура слоёв (layers)
 
@@ -198,7 +242,55 @@ MapLibre автоматически управляет коллизиями си
 
 Для отладки коллизий: `map.showCollisionBoxes = true`.
 
-## 8. Интеграция с PMTiles
+## 8. Управление изображениями (Image / Sprite Management)
+
+MapLibre требует, чтобы все иконки и изображения для symbol layers были загружены в карту через `map.addImage()` или спрайт-лист. При потенциально сотнях уникальных изображений нужна стратегия.
+
+### 8.1. Стратегия: ленивая загрузка + кеш
+
+```
+1. При старте: загружаются только builtin иконки (~15 шт: флаги-заглушки, типовые иконки)
+2. При включении слоя: загружаются все image_asset для этого hint_type
+3. Загруженные изображения кешируются в Map instance (map.hasImage() проверка)
+4. При выключении слоя: изображения НЕ удаляются (остаются в кеше до перезагрузки)
+```
+
+### 8.2. Именование
+
+Формат image ID в MapLibre: `asset:{asset_id}`
+
+```js
+// При загрузке
+const img = await loadImage(asset.file_path);
+map.addImage(`asset:${asset.id}`, img);
+
+// В layer style
+"icon-image": ["concat", "asset:", ["get", "icon_asset_id"]]
+```
+
+### 8.3. Fallback
+
+Если изображение не загружено (ещё грузится, ошибка загрузки):
+- MapLibre автоматически скрывает символ с отсутствующим `icon-image`
+- Используется `"icon-image": ["coalesce", ["image", ["concat", "asset:", ["get", "icon_asset_id"]]], ["image", "default-hint-icon"]]`
+- `default-hint-icon` — generic иконка, загружается при старте
+
+### 8.4. Ограничения размеров
+
+- Иконки: до 64×64px, автоматическое масштабирование при загрузке
+- Sample images: до 256×128px
+- Форматы: PNG (с прозрачностью), WebP, JPEG
+- MapLibre ограничение: одно изображение ≤ 1024×1024px
+
+### 8.5. Sprite sheet (future optimization)
+
+При большом количестве иконок (> 200) — компилировать sprite sheet:
+1. LayerCompiler собирает все используемые иконки
+2. Генерирует sprite.png + sprite.json
+3. MapLibre загружает через `style.sprite` URL
+4. Ускоряет начальную загрузку vs поштучный `addImage()`
+
+## 9. Интеграция с PMTiles
 
 Для overlay-слоёв с большим количеством данных (> 10 000 features):
 

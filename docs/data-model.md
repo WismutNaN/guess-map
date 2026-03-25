@@ -218,6 +218,37 @@
 | `vegetation` | Растительность | `icon` | `{biome: string, key_species: string}` |
 | `note` | Заметка | `text` | — |
 
+### 3.7. `app_settings`
+
+Персистентное хранилище настроек приложения (key-value).
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `key` | TEXT PK | Ключ настройки |
+| `value` | TEXT NOT NULL | JSON-значение |
+| `updated_at` | TEXT | ISO 8601 |
+
+**Хранимые настройки:**
+
+| Ключ | Тип значения | Описание |
+|------|-------------|----------|
+| `map.center_lng` | number | Последняя позиция карты: долгота |
+| `map.center_lat` | number | Последняя позиция карты: широта |
+| `map.zoom` | number | Последний уровень зума |
+| `map.basemap_provider` | string | Активный провайдер подложки |
+| `map.basemap_style` | string | Вариант стиля подложки |
+| `map.density_preset` | string | Активный пресет плотности |
+| `map.presentation_mode` | string | Режим представления подсказок |
+| `layers.visible` | string[] | Список включённых hint_type codes |
+| `agent.enabled` | boolean | Agent API включён |
+| `agent.port` | number | Порт Agent API |
+| `agent.token_hash` | string | bcrypt-хеш API-токена |
+| `agent.auto_approve` | boolean | Авто-принимать изменения от агента |
+| `editor.last_country` | string | Последняя выбранная страна |
+| `export.last_path` | string | Последний путь экспорта |
+
+**Примечание:** Токен Agent API хранится как bcrypt-хеш. Открытый токен показывается пользователю только при генерации и не сохраняется.
+
 ## 5. Правила целостности
 
 1. `region_hint.region_id` → `region.id` (CASCADE DELETE)
