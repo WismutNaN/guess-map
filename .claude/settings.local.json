@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm list:*)",
+      "Bash(npm install:*)",
+      "Bash(mkdir -p \"V:/guess-map/assets/geodata\")",
+      "Bash(curl -L -o ne_countries.geojson \"https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson\")",
+      "Bash(curl -L -o ne_populated_places.geojson \"https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_populated_places.geojson\")",
+      "Bash(curl -L -o ne_admin1.geojson \"https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_1_states_provinces.geojson\")",
+      "Bash(node -e \"const fs=require\\(''fs''\\); const d=JSON.parse\\(fs.readFileSync\\(''ne_admin1.geojson'',''utf8''\\)\\); console.log\\(''Admin1:'', d.features.length, ''features''\\); const d2=JSON.parse\\(fs.readFileSync\\(''ne_populated_places.geojson'',''utf8''\\)\\); console.log\\(''Places:'', d2.features.length, ''features''\\)\")",
+      "Bash(curl -L -o ne_admin1.geojson \"https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_10m_admin_1_states_provinces.geojson\")",
+      "Bash(node -e \"const fs=require\\(''fs''\\); const d=JSON.parse\\(fs.readFileSync\\(''ne_admin1.geojson'',''utf8''\\)\\); console.log\\(''Admin1:'', d.features.length, ''features''\\); console.log\\(''Sample keys:'', Object.keys\\(d.features[0].properties\\).join\\('', ''\\)\\)\")",
+      "Bash(curl -L -o ne_populated_places.geojson \"https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_10m_populated_places_simple.geojson\")",
+      "Bash(node -e \"const d=JSON.parse\\(require\\(''fs''\\).readFileSync\\(''ne_populated_places.geojson'',''utf8''\\)\\); console.log\\(''Places:'', d.features.length\\); console.log\\(''Keys:'', Object.keys\\(d.features[0].properties\\).join\\('', ''\\)\\)\")",
+      "Bash(rtk cargo:*)",
+      "Bash(cargo check:*)",
+      "Bash(cargo test:*)",
+      "Bash(npx tsc:*)",
+      "Bash(sqlite3 \"C:/Users/Wismut/AppData/Roaming/com.wismut.guess-map/guessmap.db\" \"SELECT region_level, COUNT\\(*\\) FROM region GROUP BY region_level; SELECT COUNT\\(*\\) as total FROM region;\")",
+      "Bash(curl -L -o ne_countries.geojson \"https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_10m_admin_0_countries.geojson\")",
+      "Bash(node -e \"const d=JSON.parse\\(require\\(''fs''\\).readFileSync\\(''ne_countries.geojson'',''utf8''\\)\\); console.log\\(''Countries:'', d.features.length\\); const withIso = d.features.filter\\(f => f.properties.ISO_A2 && f.properties.ISO_A2 !== ''-99'' && f.properties.ISO_A2 !== ''-1''\\); console.log\\(''With ISO_A2:'', withIso.length\\); const withEither = d.features.filter\\(f => { const a2 = f.properties.ISO_A2; const eh = f.properties.ISO_A2_EH; return \\(a2 && a2 !== ''-99'' && a2 !== ''-1''\\) || \\(eh && eh !== ''-99'' && eh !== ''-1''\\); }\\); console.log\\(''With any ISO:'', withEither.length\\)\")"
+    ]
+  }
+}
