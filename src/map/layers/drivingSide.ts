@@ -10,6 +10,35 @@ const LAYER_ID = "hint-driving-side";
  * expression on ISO_A2 to color countries by driving side.
  */
 export async function addDrivingSideLayer(map: maplibregl.Map) {
+  const fillColor = await buildDrivingSideExpression();
+
+  if (!map.getLayer(LAYER_ID)) {
+    map.addLayer(
+      {
+        id: LAYER_ID,
+        type: "fill",
+        source: "regions-countries",
+        paint: {
+          "fill-color": fillColor,
+          "fill-opacity": 0.25,
+        },
+      },
+      "region-country-border"
+    );
+  }
+
+  registerLayerGroup("driving_side", [LAYER_ID]);
+}
+
+export async function refreshDrivingSideLayer(map: maplibregl.Map) {
+  if (!map.getLayer(LAYER_ID)) {
+    return;
+  }
+  const fillColor = await buildDrivingSideExpression();
+  map.setPaintProperty(LAYER_ID, "fill-color", fillColor);
+}
+
+async function buildDrivingSideExpression() {
   const enrichmentJson = await invoke<string>("compile_polygon_enrichment", {
     hintTypeCode: "driving_side",
   });
@@ -24,18 +53,5 @@ export async function addDrivingSideLayer(map: maplibregl.Map) {
   }
   matchExpr.push("transparent");
 
-  map.addLayer(
-    {
-      id: LAYER_ID,
-      type: "fill",
-      source: "regions-countries",
-      paint: {
-        "fill-color": matchExpr as maplibregl.ExpressionSpecification,
-        "fill-opacity": 0.25,
-      },
-    },
-    "region-country-border"
-  );
-
-  registerLayerGroup("driving_side", [LAYER_ID]);
+  return matchExpr as maplibregl.ExpressionSpecification;
 }

@@ -2,7 +2,7 @@ import maplibregl from "maplibre-gl";
 
 /**
  * Load region GeoJSON sources and add country/admin1 border layers.
- * Includes hover interaction and click popup for countries.
+ * Includes hover interaction on countries.
  */
 export async function addRegionLayers(map: maplibregl.Map) {
   await addCountryLayers(map);
@@ -54,6 +54,17 @@ async function addAdmin1Layers(map: maplibregl.Map) {
   const data = await resp.json();
 
   map.addSource("regions-admin1", { type: "geojson", data });
+
+  map.addLayer({
+    id: "region-admin1-hit",
+    type: "fill",
+    source: "regions-admin1",
+    minzoom: 4,
+    paint: {
+      "fill-color": "#000000",
+      "fill-opacity": 0.01,
+    },
+  });
 
   map.addLayer({
     id: "region-admin1-border",
@@ -111,14 +122,4 @@ function addCountryInteractions(map: maplibregl.Map) {
     map.getCanvas().style.cursor = "";
   });
 
-  map.on("click", "region-country-fill", (e) => {
-    if (e.features && e.features.length > 0) {
-      const props = e.features[0].properties;
-      const name = props?.NAME_EN || props?.NAME || "Unknown";
-      new maplibregl.Popup({ closeButton: false, maxWidth: "200px" })
-        .setLngLat(e.lngLat)
-        .setHTML(`<strong>${name}</strong>`)
-        .addTo(map);
-    }
-  });
 }

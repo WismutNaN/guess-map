@@ -1,40 +1,45 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-
-interface HintTypeInfo {
-  id: string;
-  code: string;
-  title: string;
-  display_family: string;
-  sort_order: number;
-  is_active: boolean;
-}
+import type { HintTypeInfo } from "../types";
 
 interface LayerPanelProps {
   onToggle: (code: string, visible: boolean) => void;
+  refreshSignal?: number;
 }
 
-export function LayerPanel({ onToggle }: LayerPanelProps) {
+export function LayerPanel({ onToggle, refreshSignal = 0 }: LayerPanelProps) {
   const [hintTypes, setHintTypes] = useState<HintTypeInfo[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [visibility, setVisibility] = useState<Record<string, boolean>>({});
   const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
+
     Promise.all([
       invoke<HintTypeInfo[]>("get_hint_types"),
       invoke<Record<string, number>>("get_hint_counts"),
     ]).then(([types, c]) => {
-      setHintTypes(types.filter((t) => t.is_active));
+      if (cancelled) return;
+      const activeTypes = types.filter((t) => t.is_active);
+      setHintTypes(activeTypes);
       setCounts(c);
-      // Default: show types that have data
-      const vis: Record<string, boolean> = {};
-      for (const t of types) {
-        vis[t.code] = (c[t.code] ?? 0) > 0;
-      }
-      setVisibility(vis);
+      setVisibility((prev) => {
+        const next: Record<string, boolean> = {};
+        for (const t of activeTypes) {
+          next[t.code] = prev[t.code] ?? (c[t.code] ?? 0) > 0;
+        }
+        for (const t of activeTypes) {
+          onToggle(t.code, next[t.code]);
+        }
+        return next;
+      });
     });
-  }, []);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [onToggle, refreshSignal]);
 
   const handleToggle = (code: string) => {
     const next = !visibility[code];
@@ -66,7 +71,7 @@ export function LayerPanel({ onToggle }: LayerPanelProps) {
                 <input
                   type="checkbox"
                   checked={visibility[ht.code] ?? false}
-                  disabled={!hasData}
+                  disabled={!hasData && !(visibility[ht.code] ?? false)}
                   onChange={() => handleToggle(ht.code)}
                 />
                 <span className="layer-item-title">{ht.title}</span>

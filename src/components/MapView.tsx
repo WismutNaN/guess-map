@@ -1,17 +1,65 @@
 import { useEffect, useRef } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { addRegionLayers, addCityLayers, addDrivingSideLayer, addFlagLayer } from "../map/layers";
+import {
+  addCityLayers,
+  addDrivingSideLayer,
+  addFlagLayer,
+  addNoteLayer,
+  addRegionLayers,
+  addSelectionLayers,
+  setSelectedRegion,
+} from "../map/layers";
+import { bindRegionSelection } from "../map/interaction";
 import { loadMapPosition, saveMapPosition } from "../map/persistence";
+import type { RegionInfo } from "../types";
 
 interface MapViewProps {
+  editorMode: boolean;
+  selectedRegion: RegionInfo | null;
+  onRegionSelect: (region: RegionInfo | null) => void;
   onZoomChange?: (zoom: number) => void;
   onMapReady?: (map: maplibregl.Map) => void;
 }
 
-export function MapView({ onZoomChange, onMapReady }: MapViewProps) {
+export function MapView({
+  editorMode,
+  selectedRegion,
+  onRegionSelect,
+  onZoomChange,
+  onMapReady,
+}: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
+  const editorModeRef = useRef(editorMode);
+  const selectedRegionRef = useRef<RegionInfo | null>(selectedRegion);
+  const onRegionSelectRef = useRef(onRegionSelect);
+  const onZoomChangeRef = useRef(onZoomChange);
+  const onMapReadyRef = useRef(onMapReady);
+  const unbindSelectionRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    editorModeRef.current = editorMode;
+  }, [editorMode]);
+
+  useEffect(() => {
+    onRegionSelectRef.current = onRegionSelect;
+  }, [onRegionSelect]);
+
+  useEffect(() => {
+    onZoomChangeRef.current = onZoomChange;
+  }, [onZoomChange]);
+
+  useEffect(() => {
+    onMapReadyRef.current = onMapReady;
+  }, [onMapReady]);
+
+  useEffect(() => {
+    selectedRegionRef.current = selectedRegion;
+    if (mapRef.current) {
+      setSelectedRegion(mapRef.current, selectedRegion);
+    }
+  }, [selectedRegion]);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -55,34 +103,44 @@ export function MapView({ onZoomChange, onMapReady }: MapViewProps) {
       );
 
       map.on("load", async () => {
-        // Base layers
         await addRegionLayers(map);
-        // Hint layers (after regions — driving_side reuses countries source)
-        await addDrivingSideLayer(map).catch((e) =>
-          console.error("Failed to load driving_side layer:", e)
+        await addDrivingSideLayer(map).catch((error) =>
+          console.error("Failed to load driving_side layer:", error)
         );
-        // Cities above hint fills
         await addCityLayers(map);
-        // Flag labels on top
-        await addFlagLayer(map).catch((e) =>
-          console.error("Failed to load flag layer:", e)
+        await addFlagLayer(map).catch((error) =>
+          console.error("Failed to load flag layer:", error)
         );
-        onMapReady?.(map);
+        await addNoteLayer(map).catch((error) =>
+          console.error("Failed to load note layer:", error)
+        );
+
+        addSelectionLayers(map);
+        setSelectedRegion(map, selectedRegionRef.current);
+
+        unbindSelectionRef.current = bindRegionSelection(map, {
+          isEnabled: () => editorModeRef.current,
+          onRegionSelected: (region) => onRegionSelectRef.current(region),
+        });
+
+        onMapReadyRef.current?.(map);
       });
 
-      map.on("zoom", () => onZoomChange?.(map.getZoom()));
+      map.on("zoom", () => onZoomChangeRef.current?.(map.getZoom()));
       map.on("moveend", () => {
         const { lng, lat } = map.getCenter();
         saveMapPosition(lng, lat, map.getZoom());
       });
 
       mapRef.current = map;
-      onZoomChange?.(map.getZoom());
+      onZoomChangeRef.current?.(map.getZoom());
     };
 
-    initMap();
+    void initMap();
 
     return () => {
+      unbindSelectionRef.current?.();
+      unbindSelectionRef.current = null;
       mapRef.current?.remove();
       mapRef.current = null;
     };

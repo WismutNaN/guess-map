@@ -2,6 +2,7 @@ pub mod commands;
 pub mod compiler;
 pub mod db;
 pub mod import;
+pub mod services;
 pub mod seed;
 
 use db::DbState;
@@ -111,12 +112,19 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::regions::get_region_stats,
             commands::regions::search_regions,
+            commands::regions::resolve_region,
+            commands::regions::get_region_by_id,
             commands::settings::get_setting,
             commands::settings::get_setting_or,
             commands::settings::set_setting,
+            commands::asset::upload_asset_bytes,
             commands::hints::get_hint_types,
             commands::hints::get_hint_counts,
             commands::hints::get_hints_by_region,
+            commands::hints::get_hints_by_type,
+            commands::hints::create_hint,
+            commands::hints::update_hint,
+            commands::hints::delete_hint,
             commands::hints::compile_hint_layer,
             commands::hints::compile_polygon_enrichment,
         ])
