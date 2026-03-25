@@ -3,13 +3,15 @@ import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { addRegionLayers } from "../map/regionLayers";
 import { addCityLayer } from "../map/cityLayer";
+import { addDrivingSideLayer, addFlagLayer, setHintLayerVisibility } from "../map/hintLayers";
 import { loadMapPosition, saveMapPosition } from "../map/persistence";
 
 interface MapViewProps {
   onZoomChange?: (zoom: number) => void;
+  onMapReady?: (map: maplibregl.Map) => void;
 }
 
-export function MapView({ onZoomChange }: MapViewProps) {
+export function MapView({ onZoomChange, onMapReady }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
 
@@ -56,7 +58,19 @@ export function MapView({ onZoomChange }: MapViewProps) {
 
       map.on("load", async () => {
         await addRegionLayers(map);
+        // Add hint layers after region layers (they reference the same source)
+        try {
+          await addDrivingSideLayer(map);
+        } catch (e) {
+          console.error("Failed to load driving_side layer:", e);
+        }
         await addCityLayer(map);
+        try {
+          await addFlagLayer(map);
+        } catch (e) {
+          console.error("Failed to load flag layer:", e);
+        }
+        onMapReady?.(map);
       });
 
       map.on("zoom", () => {
@@ -83,3 +97,5 @@ export function MapView({ onZoomChange }: MapViewProps) {
 
   return <div ref={containerRef} className="map-container" />;
 }
+
+export { setHintLayerVisibility };

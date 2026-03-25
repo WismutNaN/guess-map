@@ -1,6 +1,8 @@
 pub mod commands;
+pub mod compiler;
 pub mod db;
 pub mod import;
+pub mod seed;
 
 use db::DbState;
 use std::path::PathBuf;
@@ -38,7 +40,8 @@ fn init_db_and_import(db_state: &DbState) {
         .unwrap_or(0);
 
     if count > 0 {
-        log::info!("Database already has {} regions, skipping import", count);
+        // Seed hint types and data even if regions exist (idempotent)
+        seed_data(&conn);
         return;
     }
 
@@ -65,6 +68,27 @@ fn init_db_and_import(db_state: &DbState) {
         },
         Err(e) => log::error!("Failed to read admin1 file {:?}: {}", admin1_path, e),
     }
+
+    // Seed hint types and data
+    seed_data(&conn);
+}
+
+fn seed_data(conn: &rusqlite::Connection) {
+    match seed::hint_types::seed(conn) {
+        Ok(n) if n > 0 => eprintln!("Seeded {} hint types", n),
+        Err(e) => eprintln!("Failed to seed hint types: {}", e),
+        _ => {}
+    }
+    match seed::driving_side::seed(conn) {
+        Ok(n) if n > 0 => eprintln!("Seeded {} driving_side hints", n),
+        Err(e) => eprintln!("Failed to seed driving_side: {}", e),
+        _ => {}
+    }
+    match seed::flags::seed(conn) {
+        Ok(n) if n > 0 => eprintln!("Seeded {} flag hints", n),
+        Err(e) => eprintln!("Failed to seed flags: {}", e),
+        _ => {}
+    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -90,6 +114,11 @@ pub fn run() {
             commands::settings::get_setting,
             commands::settings::get_setting_or,
             commands::settings::set_setting,
+            commands::hints::get_hint_types,
+            commands::hints::get_hint_counts,
+            commands::hints::get_hints_by_region,
+            commands::hints::compile_hint_layer,
+            commands::hints::compile_polygon_enrichment,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,0 +1,173 @@
+use rusqlite::Connection;
+use uuid::Uuid;
+
+struct HintTypeSeed {
+    code: &'static str,
+    title: &'static str,
+    display_family: &'static str,
+    schema_json: Option<&'static str>,
+    sort_order: i32,
+}
+
+const BUILTIN_TYPES: &[HintTypeSeed] = &[
+    HintTypeSeed {
+        code: "flag",
+        title: "Flag",
+        display_family: "icon",
+        schema_json: None,
+        sort_order: 0,
+    },
+    HintTypeSeed {
+        code: "driving_side",
+        title: "Driving Side",
+        display_family: "polygon_fill",
+        schema_json: Some(r#"{"properties":{"side":{"type":"string","enum":["left","right","mixed"]}},"required":["side"]}"#),
+        sort_order: 1,
+    },
+    HintTypeSeed {
+        code: "script_sample",
+        title: "Script Sample",
+        display_family: "image",
+        schema_json: Some(r#"{"properties":{"script_name":{"type":"string"}}}"#),
+        sort_order: 2,
+    },
+    HintTypeSeed {
+        code: "phone_hint",
+        title: "Phone Hint",
+        display_family: "text",
+        schema_json: Some(r#"{"properties":{"prefix":{"type":"string"},"format":{"type":"string"}}}"#),
+        sort_order: 3,
+    },
+    HintTypeSeed {
+        code: "road_marking",
+        title: "Road Marking",
+        display_family: "image",
+        schema_json: Some(r#"{"properties":{"marking_type":{"type":"string"}}}"#),
+        sort_order: 4,
+    },
+    HintTypeSeed {
+        code: "sign",
+        title: "Road Sign",
+        display_family: "image",
+        schema_json: Some(r#"{"properties":{"sign_type":{"type":"string"}}}"#),
+        sort_order: 5,
+    },
+    HintTypeSeed {
+        code: "pole",
+        title: "Pole / Utility Post",
+        display_family: "image",
+        schema_json: Some(r#"{"properties":{"material":{"type":"string"},"color":{"type":"string"}}}"#),
+        sort_order: 6,
+    },
+    HintTypeSeed {
+        code: "bollard",
+        title: "Bollard",
+        display_family: "image",
+        schema_json: Some(r#"{"properties":{"bollard_type":{"type":"string"}}}"#),
+        sort_order: 7,
+    },
+    HintTypeSeed {
+        code: "coverage",
+        title: "Coverage",
+        display_family: "polygon_fill",
+        schema_json: Some(r#"{"properties":{"provider":{"type":"string"},"year":{"type":"number"}}}"#),
+        sort_order: 8,
+    },
+    HintTypeSeed {
+        code: "camera_meta",
+        title: "Camera Meta",
+        display_family: "text",
+        schema_json: Some(r#"{"properties":{"generation":{"type":"string"},"has_blur":{"type":"boolean"}}}"#),
+        sort_order: 9,
+    },
+    HintTypeSeed {
+        code: "car_type",
+        title: "Survey Car Type",
+        display_family: "icon",
+        schema_json: Some(r#"{"properties":{"brand":{"type":"string"},"model":{"type":"string"},"color":{"type":"string"}}}"#),
+        sort_order: 10,
+    },
+    HintTypeSeed {
+        code: "vegetation",
+        title: "Vegetation",
+        display_family: "icon",
+        schema_json: Some(r#"{"properties":{"biome":{"type":"string"},"key_species":{"type":"string"}}}"#),
+        sort_order: 11,
+    },
+    HintTypeSeed {
+        code: "note",
+        title: "Note",
+        display_family: "text",
+        schema_json: None,
+        sort_order: 12,
+    },
+];
+
+/// Seed built-in hint types. Idempotent — skips if already present.
+pub fn seed(conn: &Connection) -> Result<usize, String> {
+    let existing: usize = conn
+        .query_row("SELECT COUNT(*) FROM hint_type", [], |row| row.get(0))
+        .map_err(|e| e.to_string())?;
+
+    if existing > 0 {
+        return Ok(0);
+    }
+
+    let mut count = 0;
+    for ht in BUILTIN_TYPES {
+        conn.execute(
+            "INSERT INTO hint_type (id, code, title, display_family, schema_json, sort_order)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            rusqlite::params![
+                Uuid::new_v4().to_string(),
+                ht.code,
+                ht.title,
+                ht.display_family,
+                ht.schema_json,
+                ht.sort_order,
+            ],
+        )
+        .map_err(|e| format!("Failed to seed hint_type {}: {}", ht.code, e))?;
+        count += 1;
+    }
+
+    Ok(count)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db;
+
+    #[test]
+    fn test_seed_hint_types() {
+        let db = db::DbState::new_in_memory().unwrap();
+        let conn = db.conn.lock().unwrap();
+
+        let count = seed(&conn).unwrap();
+        assert_eq!(count, 13);
+
+        // Verify all codes exist
+        let codes: Vec<String> = conn
+            .prepare("SELECT code FROM hint_type ORDER BY sort_order")
+            .unwrap()
+            .query_map([], |row| row.get(0))
+            .unwrap()
+            .filter_map(|r| r.ok())
+            .collect();
+
+        assert_eq!(codes[0], "flag");
+        assert_eq!(codes[1], "driving_side");
+        assert_eq!(codes.len(), 13);
+    }
+
+    #[test]
+    fn test_seed_idempotent() {
+        let db = db::DbState::new_in_memory().unwrap();
+        let conn = db.conn.lock().unwrap();
+
+        seed(&conn).unwrap();
+        let count2 = seed(&conn).unwrap();
+        assert_eq!(count2, 0); // Already seeded, skip
+    }
+}
