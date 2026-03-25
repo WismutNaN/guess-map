@@ -1,9 +1,7 @@
 import { useEffect, useRef } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { addRegionLayers } from "../map/regionLayers";
-import { addCityLayer } from "../map/cityLayer";
-import { addDrivingSideLayer, addFlagLayer, setHintLayerVisibility } from "../map/hintLayers";
+import { addRegionLayers, addCityLayers, addDrivingSideLayer, addFlagLayer } from "../map/layers";
 import { loadMapPosition, saveMapPosition } from "../map/persistence";
 
 interface MapViewProps {
@@ -57,30 +55,25 @@ export function MapView({ onZoomChange, onMapReady }: MapViewProps) {
       );
 
       map.on("load", async () => {
+        // Base layers
         await addRegionLayers(map);
-        // Add hint layers after region layers (they reference the same source)
-        try {
-          await addDrivingSideLayer(map);
-        } catch (e) {
-          console.error("Failed to load driving_side layer:", e);
-        }
-        await addCityLayer(map);
-        try {
-          await addFlagLayer(map);
-        } catch (e) {
-          console.error("Failed to load flag layer:", e);
-        }
+        // Hint layers (after regions — driving_side reuses countries source)
+        await addDrivingSideLayer(map).catch((e) =>
+          console.error("Failed to load driving_side layer:", e)
+        );
+        // Cities above hint fills
+        await addCityLayers(map);
+        // Flag labels on top
+        await addFlagLayer(map).catch((e) =>
+          console.error("Failed to load flag layer:", e)
+        );
         onMapReady?.(map);
       });
 
-      map.on("zoom", () => {
-        onZoomChange?.(map.getZoom());
-      });
-
-      // Save position on move end
+      map.on("zoom", () => onZoomChange?.(map.getZoom()));
       map.on("moveend", () => {
-        const center = map.getCenter();
-        saveMapPosition(center.lng, center.lat, map.getZoom());
+        const { lng, lat } = map.getCenter();
+        saveMapPosition(lng, lat, map.getZoom());
       });
 
       mapRef.current = map;
@@ -97,5 +90,3 @@ export function MapView({ onZoomChange, onMapReady }: MapViewProps) {
 
   return <div ref={containerRef} className="map-container" />;
 }
-
-export { setHintLayerVisibility };

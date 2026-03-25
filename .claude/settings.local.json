@@ -20,7 +20,8 @@
       "Bash(curl -L -o ne_countries.geojson \"https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_10m_admin_0_countries.geojson\")",
       "Bash(node -e \"const d=JSON.parse\\(require\\(''fs''\\).readFileSync\\(''ne_countries.geojson'',''utf8''\\)\\); console.log\\(''Countries:'', d.features.length\\); const withIso = d.features.filter\\(f => f.properties.ISO_A2 && f.properties.ISO_A2 !== ''-99'' && f.properties.ISO_A2 !== ''-1''\\); console.log\\(''With ISO_A2:'', withIso.length\\); const withEither = d.features.filter\\(f => { const a2 = f.properties.ISO_A2; const eh = f.properties.ISO_A2_EH; return \\(a2 && a2 !== ''-99'' && a2 !== ''-1''\\) || \\(eh && eh !== ''-99'' && eh !== ''-1''\\); }\\); console.log\\(''With any ISO:'', withEither.length\\)\")",
       "Bash(npx vite:*)",
-      "Bash(cargo run:*)"
+      "Bash(cargo run:*)",
+      "Bash(find src-tauri/src -type f -name \"*.rs\" -exec ls -lh {})"
     ]
   }
 }

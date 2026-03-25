@@ -1,16 +1,21 @@
 import maplibregl from "maplibre-gl";
 
+/**
+ * Load region GeoJSON sources and add country/admin1 border layers.
+ * Includes hover interaction and click popup for countries.
+ */
 export async function addRegionLayers(map: maplibregl.Map) {
-  // Load countries GeoJSON from public directory
-  const countriesResp = await fetch("/geodata/ne_countries.geojson");
-  const countriesData = await countriesResp.json();
+  await addCountryLayers(map);
+  await addAdmin1Layers(map);
+  addCountryInteractions(map);
+}
 
-  map.addSource("regions-countries", {
-    type: "geojson",
-    data: countriesData,
-  });
+async function addCountryLayers(map: maplibregl.Map) {
+  const resp = await fetch("/geodata/ne_countries.geojson");
+  const data = await resp.json();
 
-  // Country fill — subtle transparent fill for hover interaction
+  map.addSource("regions-countries", { type: "geojson", data });
+
   map.addLayer({
     id: "region-country-fill",
     type: "fill",
@@ -26,61 +31,54 @@ export async function addRegionLayers(map: maplibregl.Map) {
     },
   });
 
-  // Country borders
   map.addLayer({
     id: "region-country-border",
     type: "line",
     source: "regions-countries",
+    layout: { "line-join": "round", "line-cap": "round" },
     paint: {
       "line-color": "#627BC1",
       "line-width": [
-        "interpolate",
-        ["linear"],
-        ["zoom"],
-        1, 0.5,
-        4, 1,
-        8, 1.5,
+        "interpolate", ["linear"], ["zoom"],
+        1, 0.8,
+        4, 1.2,
+        8, 1.8,
       ],
-      "line-opacity": 0.6,
+      "line-opacity": 0.7,
     },
   });
+}
 
-  // Load admin1 GeoJSON
-  const admin1Resp = await fetch("/geodata/ne_admin1.geojson");
-  const admin1Data = await admin1Resp.json();
+async function addAdmin1Layers(map: maplibregl.Map) {
+  const resp = await fetch("/geodata/ne_admin1.geojson");
+  const data = await resp.json();
 
-  map.addSource("regions-admin1", {
-    type: "geojson",
-    data: admin1Data,
-  });
+  map.addSource("regions-admin1", { type: "geojson", data });
 
-  // Admin1 borders — visible only at higher zoom
   map.addLayer({
     id: "region-admin1-border",
     type: "line",
     source: "regions-admin1",
     minzoom: 4,
+    layout: { "line-join": "round", "line-cap": "round" },
     paint: {
       "line-color": "#8899AA",
       "line-width": [
-        "interpolate",
-        ["linear"],
-        ["zoom"],
+        "interpolate", ["linear"], ["zoom"],
         4, 0.3,
         8, 0.8,
       ],
       "line-opacity": [
-        "interpolate",
-        ["linear"],
-        ["zoom"],
+        "interpolate", ["linear"], ["zoom"],
         4, 0.2,
         7, 0.5,
       ],
       "line-dasharray": [2, 2],
     },
   });
+}
 
-  // Hover interaction for countries
+function addCountryInteractions(map: maplibregl.Map) {
   let hoveredId: number | string | null = null;
 
   map.on("mousemove", "region-country-fill", (e) => {
@@ -113,7 +111,6 @@ export async function addRegionLayers(map: maplibregl.Map) {
     map.getCanvas().style.cursor = "";
   });
 
-  // Click — show country name tooltip
   map.on("click", "region-country-fill", (e) => {
     if (e.features && e.features.length > 0) {
       const props = e.features[0].properties;

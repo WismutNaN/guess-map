@@ -5,71 +5,29 @@ use uuid::Uuid;
 /// Import countries from Natural Earth GeoJSON.
 /// Returns the number of imported regions.
 pub fn import_countries(conn: &Connection, geojson_str: &str) -> Result<usize, String> {
-    let fc: FeatureCollection = geojson_str
-        .parse::<geojson::GeoJson>()
-        .map_err(|e| format!("Failed to parse countries GeoJSON: {}", e))?
-        .try_into()
-        .map_err(|e| format!("Not a FeatureCollection: {}", e))?;
-
-    let mut count = 0;
-
+    let fc = parse_feature_collection(geojson_str, "countries")?;
     let tx = conn
         .unchecked_transaction()
         .map_err(|e| format!("Transaction error: {}", e))?;
 
+    let mut count = 0;
     for feature in &fc.features {
         let props = match &feature.properties {
             Some(p) => p,
             None => continue,
         };
 
-        let name = props
-            .get("NAME")
-            .and_then(|v| v.as_str())
-            .unwrap_or("Unknown");
+        let name = prop_str(props, "NAME").unwrap_or("Unknown");
+        let name_en = prop_str(props, "NAME_EN").or_else(|| prop_str(props, "NAME"));
 
-        let name_en = props
-            .get("NAME_EN")
-            .and_then(|v| v.as_str())
-            .or_else(|| props.get("NAME").and_then(|v| v.as_str()));
-
-        let iso_a2 = props
-            .get("ISO_A2")
-            .and_then(|v| v.as_str())
-            .unwrap_or("-1");
-
-        // Skip features without valid ISO code
-        if iso_a2 == "-1" || iso_a2 == "-99" {
-            // Try ISO_A2_EH as fallback
-            let iso_a2_eh = props
-                .get("ISO_A2_EH")
-                .and_then(|v| v.as_str())
-                .unwrap_or("-1");
-            if iso_a2_eh == "-1" || iso_a2_eh == "-99" {
-                continue;
-            }
-            let (lng, lat) = centroid_from_feature(feature);
-            let geometry_ref = format!("countries:{}", iso_a2_eh);
-
-            tx.execute(
-                "INSERT OR IGNORE INTO region (id, name, name_en, country_code, region_level, geometry_ref, anchor_lng, anchor_lat)
-                 VALUES (?1, ?2, ?3, ?4, 'country', ?5, ?6, ?7)",
-                rusqlite::params![
-                    Uuid::new_v4().to_string(),
-                    name,
-                    name_en,
-                    iso_a2_eh,
-                    geometry_ref,
-                    lng,
-                    lat
-                ],
-            ).map_err(|e| format!("Insert error: {}", e))?;
-            count += 1;
-            continue;
-        }
+        // Try ISO_A2, fall back to ISO_A2_EH
+        let iso_a2 = resolve_iso_code(props, &["ISO_A2", "ISO_A2_EH"]);
+        let iso_a2 = match iso_a2 {
+            Some(code) => code,
+            None => continue,
+        };
 
         let (lng, lat) = centroid_from_feature(feature);
-        let geometry_ref = format!("countries:{}", iso_a2);
 
         tx.execute(
             "INSERT OR IGNORE INTO region (id, name, name_en, country_code, region_level, geometry_ref, anchor_lng, anchor_lat)
@@ -79,12 +37,12 @@ pub fn import_countries(conn: &Connection, geojson_str: &str) -> Result<usize, S
                 name,
                 name_en,
                 iso_a2,
-                geometry_ref,
+                format!("countries:{}", iso_a2),
                 lng,
-                lat
+                lat,
             ],
-        ).map_err(|e| format!("Insert error: {}", e))?;
-
+        )
+        .map_err(|e| format!("Insert error: {}", e))?;
         count += 1;
     }
 
@@ -95,59 +53,31 @@ pub fn import_countries(conn: &Connection, geojson_str: &str) -> Result<usize, S
 /// Import admin1 regions from Natural Earth GeoJSON.
 /// Returns the number of imported regions.
 pub fn import_admin1(conn: &Connection, geojson_str: &str) -> Result<usize, String> {
-    let fc: FeatureCollection = geojson_str
-        .parse::<geojson::GeoJson>()
-        .map_err(|e| format!("Failed to parse admin1 GeoJSON: {}", e))?
-        .try_into()
-        .map_err(|e| format!("Not a FeatureCollection: {}", e))?;
-
-    let mut count = 0;
-
+    let fc = parse_feature_collection(geojson_str, "admin1")?;
     let tx = conn
         .unchecked_transaction()
         .map_err(|e| format!("Transaction error: {}", e))?;
 
+    let mut count = 0;
     for feature in &fc.features {
         let props = match &feature.properties {
             Some(p) => p,
             None => continue,
         };
 
-        let name = props
-            .get("name")
-            .and_then(|v| v.as_str())
-            .unwrap_or("Unknown");
-
-        let name_en = props
-            .get("name_en")
-            .and_then(|v| v.as_str())
-            .or_else(|| props.get("name").and_then(|v| v.as_str()));
-
-        let iso_a2 = props
-            .get("iso_a2")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
-
-        if iso_a2.is_empty() || iso_a2 == "-1" || iso_a2 == "-99" {
-            continue;
-        }
-
-        let iso_3166_2 = props
-            .get("iso_3166_2")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
-
-        let geometry_ref = if !iso_3166_2.is_empty() && iso_3166_2 != "-99" {
-            format!("admin1:{}", iso_3166_2)
-        } else {
-            let adm1_code = props
-                .get("adm1_code")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
-            format!("admin1:{}", adm1_code)
+        let name = prop_str(props, "name").unwrap_or("Unknown");
+        let name_en = prop_str(props, "name_en").or_else(|| prop_str(props, "name"));
+        let iso_a2 = match prop_str(props, "iso_a2") {
+            Some(c) if !c.is_empty() && c != "-1" && c != "-99" => c,
+            _ => continue,
         };
 
-        // Find parent country
+        let geometry_ref = prop_str(props, "iso_3166_2")
+            .filter(|v| !v.is_empty() && *v != "-99")
+            .or_else(|| prop_str(props, "adm1_code"))
+            .map(|code| format!("admin1:{}", code))
+            .unwrap_or_default();
+
         let parent_id: Option<String> = conn
             .query_row(
                 "SELECT id FROM region WHERE country_code = ?1 AND region_level = 'country' LIMIT 1",
@@ -156,16 +86,9 @@ pub fn import_admin1(conn: &Connection, geojson_str: &str) -> Result<usize, Stri
             )
             .ok();
 
-        let lat = props
-            .get("latitude")
-            .and_then(|v| v.as_f64())
-            .unwrap_or(0.0);
-        let lng = props
-            .get("longitude")
-            .and_then(|v| v.as_f64())
-            .unwrap_or(0.0);
-
-        // Use provided lat/lng if available, otherwise compute centroid
+        // Prefer explicit lat/lng from properties, fall back to centroid
+        let lat = prop_f64(props, "latitude").unwrap_or(0.0);
+        let lng = prop_f64(props, "longitude").unwrap_or(0.0);
         let (final_lng, final_lat) = if lng != 0.0 || lat != 0.0 {
             (lng, lat)
         } else {
@@ -183,15 +106,47 @@ pub fn import_admin1(conn: &Connection, geojson_str: &str) -> Result<usize, Stri
                 parent_id,
                 geometry_ref,
                 final_lng,
-                final_lat
+                final_lat,
             ],
-        ).map_err(|e| format!("Insert error: {}", e))?;
-
+        )
+        .map_err(|e| format!("Insert error: {}", e))?;
         count += 1;
     }
 
     tx.commit().map_err(|e| format!("Commit error: {}", e))?;
     Ok(count)
+}
+
+// ── Helpers ──────────────────────────────────────────────
+
+fn parse_feature_collection(json: &str, label: &str) -> Result<FeatureCollection, String> {
+    json.parse::<geojson::GeoJson>()
+        .map_err(|e| format!("Failed to parse {} GeoJSON: {}", label, e))?
+        .try_into()
+        .map_err(|e| format!("Not a FeatureCollection: {}", e))
+}
+
+fn prop_str<'a>(props: &'a serde_json::Map<String, serde_json::Value>, key: &str) -> Option<&'a str> {
+    props.get(key).and_then(|v| v.as_str())
+}
+
+fn prop_f64(props: &serde_json::Map<String, serde_json::Value>, key: &str) -> Option<f64> {
+    props.get(key).and_then(|v| v.as_f64())
+}
+
+/// Try multiple property keys in order, returning the first valid ISO code.
+fn resolve_iso_code<'a>(
+    props: &'a serde_json::Map<String, serde_json::Value>,
+    keys: &[&str],
+) -> Option<&'a str> {
+    for key in keys {
+        if let Some(code) = prop_str(props, key) {
+            if code != "-1" && code != "-99" {
+                return Some(code);
+            }
+        }
+    }
+    None
 }
 
 /// Compute a simple centroid from a GeoJSON feature.
@@ -204,7 +159,7 @@ fn centroid_from_feature(feature: &geojson::Feature) -> (f64, f64) {
 
     let mut sum_lng = 0.0;
     let mut sum_lat = 0.0;
-    let mut n = 0;
+    let mut n = 0usize;
 
     match &geometry.value {
         GeoValue::Polygon(rings) => {
@@ -227,9 +182,7 @@ fn centroid_from_feature(feature: &geojson::Feature) -> (f64, f64) {
                 }
             }
         }
-        GeoValue::Point(coord) => {
-            return (coord[0], coord[1]);
-        }
+        GeoValue::Point(coord) => return (coord[0], coord[1]),
         _ => {}
     }
 
@@ -278,10 +231,30 @@ mod tests {
     }
 
     #[test]
+    fn test_import_countries_fallback_iso() {
+        let conn = test_conn();
+        let geojson = r#"{
+            "type": "FeatureCollection",
+            "features": [{
+                "type": "Feature",
+                "properties": {"NAME": "Kosovo", "ISO_A2": "-99", "ISO_A2_EH": "XK"},
+                "geometry": {"type": "Polygon", "coordinates": [[[0,0],[1,0],[1,1],[0,1],[0,0]]]}
+            }]
+        }"#;
+
+        let count = import_countries(&conn, geojson).unwrap();
+        assert_eq!(count, 1);
+
+        let code: String = conn
+            .query_row("SELECT country_code FROM region LIMIT 1", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(code, "XK");
+    }
+
+    #[test]
     fn test_import_admin1_with_parent() {
         let conn = test_conn();
 
-        // First insert a country
         let countries = r#"{
             "type": "FeatureCollection",
             "features": [{
@@ -292,7 +265,6 @@ mod tests {
         }"#;
         import_countries(&conn, countries).unwrap();
 
-        // Then import admin1
         let admin1 = r#"{
             "type": "FeatureCollection",
             "features": [{
@@ -304,7 +276,6 @@ mod tests {
         let count = import_admin1(&conn, admin1).unwrap();
         assert_eq!(count, 1);
 
-        // Verify parent linkage
         let parent_id: Option<String> = conn
             .query_row(
                 "SELECT parent_id FROM region WHERE region_level = 'admin1' AND country_code = 'TL'",
