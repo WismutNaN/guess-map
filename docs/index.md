@@ -17,6 +17,7 @@ Desktop-приложение на Tauri 2 + React + MapLibre GL JS.
 | [Источники геоданных](geodata-sources.md) | Natural Earth, импорт регионов, geometry_ref, ограничения |
 | [Режимы отображения](display-modes.md) | Density presets, presentation modes, города, управление плотностью |
 | [MVP Roadmap](mvp-roadmap.md) | Фазы разработки, зависимости, что исключено |
+| **[PLAN.md](PLAN.md)** | **Детальный план с задачами, тестами и gate criteria по фазам** |
 
 ## Ключевые архитектурные решения
 
