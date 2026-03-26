@@ -22,7 +22,16 @@
       "Bash(npx vite:*)",
       "Bash(cargo run:*)",
       "Bash(find src-tauri/src -type f -name \"*.rs\" -exec ls -lh {})",
-      "Bash(node -e \":*)"
+      "Bash(node -e \":*)",
+      "WebFetch(domain:geohints.com)",
+      "WebFetch(domain:education.openguessr.com)",
+      "WebSearch",
+      "WebFetch(domain:geo.emily.bz)",
+      "WebFetch(domain:sv-map.netlify.app)",
+      "Bash(cargo build:*)",
+      "Bash(node -e \"const pkg = require\\(''./node_modules/maplibre-gl/package.json''\\); console.log\\(''maplibre-gl version:'', pkg.version\\)\")",
+      "Bash(rtk npm:*)",
+      "Bash(npm ls:*)"
     ]
   }
 }

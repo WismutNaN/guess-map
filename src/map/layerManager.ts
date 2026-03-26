@@ -27,11 +27,15 @@ export function setLayerGroupVisibility(
   visible: boolean
 ) {
   const group = registry.get(groupName);
-  if (!group) return;
+  if (!group) {
+    console.warn(`[LayerMgr] group "${groupName}" not found in registry`);
+    return;
+  }
 
   group.visible = visible;
   for (const id of group.layerIds) {
-    if (map.getLayer(id)) {
+    const layer = map.getLayer(id);
+    if (layer) {
       map.setLayoutProperty(id, "visibility", visible ? "visible" : "none");
     }
   }

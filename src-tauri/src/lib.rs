@@ -4,6 +4,7 @@ pub mod db;
 pub mod import;
 pub mod services;
 pub mod seed;
+pub mod tile_server;
 
 use db::DbState;
 use std::path::PathBuf;
@@ -106,6 +107,13 @@ pub fn run() {
 
             init_db_and_import(&db_state);
 
+            // Start tile proxy server (local HTTP on 127.0.0.1)
+            let tile_port = tile_server::start();
+            {
+                let conn = db_state.conn.lock().unwrap();
+                let _ = db::settings::set(&conn, "tile_proxy.port", &tile_port.to_string());
+            }
+
             app.manage(db_state);
             Ok(())
         })
@@ -127,6 +135,7 @@ pub fn run() {
             commands::hints::delete_hint,
             commands::hints::compile_hint_layer,
             commands::hints::compile_polygon_enrichment,
+            commands::tile_proxy::fetch_gsv_tile,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

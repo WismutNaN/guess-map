@@ -101,22 +101,22 @@ const BUILTIN_TYPES: &[HintTypeSeed] = &[
         schema_json: None,
         sort_order: 12,
     },
+    HintTypeSeed {
+        code: "highway",
+        title: "Highway / Route",
+        display_family: "line",
+        schema_json: Some(r#"{"properties":{"route_system":{"type":"string","enum":["us_interstate","us_highway","european_e","national","other"]},"route_number":{"type":"string"},"direction":{"type":"string","enum":["N-S","E-W","NE-SW","NW-SE"]}},"required":["route_system","route_number"]}"#),
+        sort_order: 13,
+    },
 ];
 
-/// Seed built-in hint types. Idempotent — skips if already present.
+/// Seed built-in hint types. Idempotent — uses INSERT OR IGNORE per type,
+/// so new types get added to existing databases without affecting existing data.
 pub fn seed(conn: &Connection) -> Result<usize, String> {
-    let existing: usize = conn
-        .query_row("SELECT COUNT(*) FROM hint_type", [], |row| row.get(0))
-        .map_err(|e| e.to_string())?;
-
-    if existing > 0 {
-        return Ok(0);
-    }
-
     let mut count = 0;
     for ht in BUILTIN_TYPES {
-        conn.execute(
-            "INSERT INTO hint_type (id, code, title, display_family, schema_json, sort_order)
+        let changed = conn.execute(
+            "INSERT OR IGNORE INTO hint_type (id, code, title, display_family, schema_json, sort_order)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             rusqlite::params![
                 Uuid::new_v4().to_string(),
@@ -128,7 +128,7 @@ pub fn seed(conn: &Connection) -> Result<usize, String> {
             ],
         )
         .map_err(|e| format!("Failed to seed hint_type {}: {}", ht.code, e))?;
-        count += 1;
+        count += changed;
     }
 
     Ok(count)
@@ -145,7 +145,7 @@ mod tests {
         let conn = db.conn.lock().unwrap();
 
         let count = seed(&conn).unwrap();
-        assert_eq!(count, 13);
+        assert_eq!(count, BUILTIN_TYPES.len());
 
         // Verify all codes exist
         let codes: Vec<String> = conn
@@ -158,7 +158,7 @@ mod tests {
 
         assert_eq!(codes[0], "flag");
         assert_eq!(codes[1], "driving_side");
-        assert_eq!(codes.len(), 13);
+        assert_eq!(codes.len(), BUILTIN_TYPES.len());
     }
 
     #[test]

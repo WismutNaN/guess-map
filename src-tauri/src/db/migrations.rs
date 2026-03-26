@@ -2,6 +2,7 @@ use rusqlite::Connection;
 
 const MIGRATIONS: &[(&str, &str)] = &[
     ("001_initial", include_str!("../../migrations/001_initial.sql")),
+    ("002_line_and_route", include_str!("../../migrations/002_line_and_route.sql")),
 ];
 
 pub fn run_all(conn: &Connection) -> Result<(), rusqlite::Error> {

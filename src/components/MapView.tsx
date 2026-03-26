@@ -3,10 +3,12 @@ import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import {
   addCityLayers,
+  addCoverageLayer,
   addDrivingSideLayer,
   addFlagLayer,
   addNoteLayer,
   addRegionLayers,
+  addRouteLayers,
   addSelectionLayers,
   setSelectedRegion,
 } from "../map/layers";
@@ -113,6 +115,12 @@ export function MapView({
         );
         await addNoteLayer(map).catch((error) =>
           console.error("Failed to load note layer:", error)
+        );
+        await addCoverageLayer(map).catch((error) =>
+          console.error("Failed to load coverage layer:", error)
+        );
+        await addRouteLayers(map).catch((error) =>
+          console.error("Failed to load route layers:", error)
         );
 
         addSelectionLayers(map);

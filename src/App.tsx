@@ -86,13 +86,15 @@ function App() {
         onRegionSelect={handleSearchRegionSelect}
       />
 
-      <MapView
-        editorMode={mode === "editor"}
-        selectedRegion={selectedRegion}
-        onRegionSelect={setSelectedRegion}
-        onZoomChange={setZoom}
-        onMapReady={handleMapReady}
-      />
+      <div className="map-wrapper">
+        <MapView
+          editorMode={mode === "editor"}
+          selectedRegion={selectedRegion}
+          onRegionSelect={setSelectedRegion}
+          onZoomChange={setZoom}
+          onMapReady={handleMapReady}
+        />
+      </div>
 
       <LayerPanel onToggle={handleLayerToggle} refreshSignal={layerPanelVersion} />
 

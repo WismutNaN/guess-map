@@ -176,6 +176,64 @@ Tauri-окно с интерактивной картой мира. Пользо
 
 ---
 
+## Phase 3.5: Coverage & Routes — Покрытие GSV и маршруты
+
+### Цель
+Слой покрытия Google Street View на карте. Подготовка инфраструктуры для линейной геометрии (автотрассы, маршруты).
+
+### Контекст
+GeoGuessr использует Google Street View. Охват GSV определяет, где можно играть (107 стран). Визуализация покрытия — критически важная информация для тренировки. Кроме того, автотрассы (US Interstate, European E-roads) являются сильными подсказками в GeoGuessr, но требуют LINE geometry, которой нет в текущей модели.
+
+### Релевантная документация
+- [Система подсказок](hint-system.md) — display families, расширяемость типов
+- [Картографический движок](map-engine.md) §2 — sources, layers, data-driven styling
+- [Модель данных](data-model.md) §3.2 — hint_type.display_family
+
+### Источники данных
+- **GSV Coverage tiles**: Google raster tiles `lyrs=svv` — показывают синие линии покрытия Street View
+- **Маршруты**: OpenStreetMap highway data (будущий импорт)
+- **Camera generations**: [geohints.com](https://geohints.com/meta/cameraGens) — поколения камер по странам
+
+### Задачи
+
+| # | Задача | Файлы/модули |
+|---|--------|-------------|
+| 3.5.1 | ✅ GSV Coverage: raster tile overlay от Google SVV | `src/map/layers/coverage.ts` |
+| 3.5.2 | ✅ Toggle в LayerPanel для Coverage (отдельно от hint layers) | `src/components/LayerPanel.tsx` |
+| 3.5.3 | ✅ Регулировка прозрачности Coverage слоя | `src/map/layers/coverage.ts` |
+| 3.5.4 | Добавить `line` в display_family (миграция 002) | `src-tauri/migrations/002_line_display.sql` |
+| 3.5.5 | `compile_line_layer()` в LayerCompiler | `src-tauri/src/compiler/` |
+| 3.5.6 | Хранение line geometry: `geometry_ref` → внешний GeoJSON (аналогично странам) | `src-tauri/src/import/` |
+| 3.5.7 | Seed: camera_generation hint_type (polygon_fill) | `src-tauri/src/seed/` |
+| 3.5.8 | Импорт GeoJSON маршрутов (US Interstate, European E-roads) | `src-tauri/src/import/routes.rs` |
+| 3.5.9 | Рендеринг line layers на карте с data-driven styling | `src/map/layers/routes.ts` |
+| 3.5.10 | UI: маршруты в LayerPanel с фильтрацией по региону | `src/components/LayerPanel.tsx` |
+
+### Изменения модели данных
+- `display_family` получает новое значение `'line'` — для линейной геометрии
+- `region_level` получает значение `'route'` — маршруты как особый тип региона
+- `geometry_ref` формат: `routes:<route_id>` — ссылка на features во внешнем GeoJSON
+- **Без breaking changes**: новые значения enum, существующие данные не затронуты
+
+### Тесты
+
+| Тип | Что тестируется |
+|-----|----------------|
+| Unit (TS) | Coverage layer добавляется/удаляется, opacity регулируется |
+| Unit (Rust) | `compile_line_layer` производит GeoJSON с LineString features |
+| Unit (Rust) | Import routes: парсинг GeoJSON, создание region + hint записей |
+| E2E | GSV Coverage видно на карте (синие линии) |
+| E2E | Toggle Coverage вкл/выкл работает |
+
+### Gate Criteria
+
+- [ ] GSV Coverage overlay видим на карте и переключается
+- [ ] `line` display_family работает в LayerCompiler
+- [ ] ≥ 1 набор маршрутов импортирован и отображается
+- [ ] Все тесты проходят
+
+---
+
 ## Phase 4: Agent API — API для LLM-агентов
 
 ### Цель
@@ -403,13 +461,14 @@ LLM-агент может программно читать и писать да
 | 1 | Skeleton | Карта мира с границами и городами | — |
 | 2 | Hint Rendering | Подсказки видны на карте | Phase 1 |
 | 3 | Knowledge Editor | Пользователь добавляет подсказки через UI | Phase 2 |
+| 3.5 | Coverage & Routes | GSV покрытие, линейная геометрия маршрутов | Phase 3 |
 | 4 | Agent API | LLM-агент заполняет данные через HTTP | Phase 2 |
 | 5 | Bulk Operations | Массовые операции, журнал изменений | Phase 3 |
 | 6 | Display & Performance | Пресеты плотности, производительность | Phase 2 |
 | 7 | Basemap & Polish | Офлайн basemap, export/import, custom types | Phase 3, 4 |
 
 ```
-Phase 1 ──→ Phase 2 ──┬──→ Phase 3 ──→ Phase 5
+Phase 1 ──→ Phase 2 ──┬──→ Phase 3 ──→ Phase 3.5 ──→ Phase 5
                        │                  │
                        ├──→ Phase 4 ──────┤
                        │                  │
@@ -417,6 +476,7 @@ Phase 1 ──→ Phase 2 ──┬──→ Phase 3 ──→ Phase 5
 ```
 
 Phase 3 и Phase 4 разрабатываются параллельно.
+Phase 3.5 выполняется после Phase 3 (нужен editor для ручного ввода route hints).
 Phase 5 и Phase 6 разрабатываются параллельно.
 Phase 7 — финализация после Phase 3+4.
 

@@ -7,6 +7,11 @@ interface LayerPanelProps {
   refreshSignal?: number;
 }
 
+const OVERLAY_LAYERS = [
+  { code: "gsv_coverage", title: "GSV Coverage", icon: "📍" },
+  { code: "routes", title: "Routes / Highways", icon: "🛣️" },
+] as const;
+
 export function LayerPanel({ onToggle, refreshSignal = 0 }: LayerPanelProps) {
   const [hintTypes, setHintTypes] = useState<HintTypeInfo[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
@@ -25,12 +30,18 @@ export function LayerPanel({ onToggle, refreshSignal = 0 }: LayerPanelProps) {
       setHintTypes(activeTypes);
       setCounts(c);
       setVisibility((prev) => {
-        const next: Record<string, boolean> = {};
+        const next: Record<string, boolean> = { ...prev };
+        for (const ol of OVERLAY_LAYERS) {
+          next[ol.code] = prev[ol.code] ?? false;
+        }
         for (const t of activeTypes) {
           next[t.code] = prev[t.code] ?? (c[t.code] ?? 0) > 0;
         }
         for (const t of activeTypes) {
           onToggle(t.code, next[t.code]);
+        }
+        for (const ol of OVERLAY_LAYERS) {
+          onToggle(ol.code, next[ol.code]);
         }
         return next;
       });
@@ -60,6 +71,20 @@ export function LayerPanel({ onToggle, refreshSignal = 0 }: LayerPanelProps) {
       </div>
       {!collapsed && (
         <div className="layer-panel-body">
+          <div className="layer-section-label">Overlays</div>
+          {OVERLAY_LAYERS.map((ol) => (
+            <label key={ol.code} className="layer-item">
+              <input
+                type="checkbox"
+                checked={visibility[ol.code] ?? false}
+                onChange={() => handleToggle(ol.code)}
+              />
+              <span className="layer-item-title">
+                {ol.icon} {ol.title}
+              </span>
+            </label>
+          ))}
+          <div className="layer-section-label">Hints</div>
           {hintTypes.map((ht) => {
             const count = counts[ht.code] ?? 0;
             const hasData = count > 0;
