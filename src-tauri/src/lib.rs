@@ -1,3 +1,4 @@
+pub mod agent;
 pub mod commands;
 pub mod compiler;
 pub mod db;
@@ -128,6 +129,8 @@ pub fn run() {
             let geodata_dir = find_geodata_dir();
 
             let db_state = DbState::new(&db_path).expect("Failed to initialize database");
+            let db_pool = db::pool::create_pool(&db_path).expect("Failed to initialize DB pool");
+            let agent_state = agent::AgentServerState::new(app.handle().clone(), db_pool);
 
             {
                 let conn = db_state.conn.lock().unwrap();
@@ -144,7 +147,12 @@ pub fn run() {
                 let _ = db::settings::set(&conn, "tile_proxy.port", &tile_port.to_string());
             }
 
+            if let Err(error) = agent::bootstrap_runtime(&db_state, &agent_state) {
+                log::error!("Failed to bootstrap Agent API runtime: {}", error);
+            }
+
             app.manage(db_state);
+            app.manage(agent_state);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -166,6 +174,9 @@ pub fn run() {
             commands::hints::compile_hint_layer,
             commands::hints::compile_polygon_enrichment,
             commands::hints::compile_line_layer,
+            agent::agent_get_settings,
+            agent::agent_save_settings,
+            agent::agent_regenerate_token,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

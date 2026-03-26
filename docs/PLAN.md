@@ -256,70 +256,58 @@ LLM-агент может программно читать и писать да
 - [Модель данных](data-model.md) §3.7 — `app_settings`: хранение порта, токена, auto-approve
 - [Система подсказок](hint-system.md) §7 — правила валидации при сохранении hint
 
-### Готовность к старту Phase 4 (на 2026-03-26)
+### Фактический статус на 2026-03-26
 
-**Готово:**
-- CRUD и валидация hints уже реализованы и покрыты тестами (`create/update/delete`, schema validation, revision log)
-- Есть рабочие команды чтения справочников/регионов и инфраструктура `app_settings` (`get/set`)
-- SQLite уже работает в `WAL` + `busy_timeout` режиме
-- Есть устоявшийся паттерн модулей backend (`commands/*`, `services/*`, `repository`)
-- Есть рабочий пример локального HTTP-сервиса в рантайме (tile proxy), что снижает риск по сетевой части Phase 4
-
-**Не готово (нужно сделать в Phase 4):**
-- Отсутствует каркас `src-tauri/src/agent/*` (server/auth/routes/middleware/ws)
-- Нет token auth (hash/verify) и модели lifecycle токена
-- Нет connection pool (`r2d2`/`deadpool`) для конкурентного UI+API доступа
-- Нет OpenAPI/schema endpoint и контрактных integration-тестов HTTP API
-
-**Вывод:**  
-Переход к реализации **Phase 4 можно начинать сейчас**. Phase 3.5 закрыта, route backlog отсутствует.
+Фаза **4 завершена**: Agent API поднят в рантайме Tauri, разбит по зонам ответственности (`server/auth/middleware/routes/*`), поддерживает токен-аутентификацию, rate limiting, connection pool, UI-настройки и live обновление карты по событиям API.
 
 ### Задачи
 
 | # | Задача | Файлы/модули |
 |---|--------|-------------|
-| 4.1 | HTTP-сервер внутри Tauri (axum, localhost-only) | `src-tauri/src/agent/server.rs` |
-| 4.2 | API token: генерация, хранение хеша в app_settings, проверка Bearer | `src-tauri/src/agent/auth.rs` |
-| 4.3 | SQLite WAL mode + connection pool (r2d2) для конкурентного доступа | `src-tauri/src/db/pool.rs` |
-| 4.4 | `GET /api/hint-types` — список типов | `src-tauri/src/agent/routes/` |
-| 4.5 | `GET /api/regions` — список регионов с фильтрацией | `src-tauri/src/agent/routes/` |
-| 4.6 | `GET /api/regions/:id` — регион с hints | `src-tauri/src/agent/routes/` |
-| 4.7 | `POST /api/hints` — создание одного hint | `src-tauri/src/agent/routes/` |
-| 4.8 | `POST /api/hints/batch` — массовое создание (до 10 000) | `src-tauri/src/agent/routes/` |
-| 4.9 | `POST /api/hints/by-country` — hint для всех регионов страны | `src-tauri/src/agent/routes/` |
-| 4.10 | `PUT /api/hints/:id`, `DELETE /api/hints/:id` | `src-tauri/src/agent/routes/` |
-| 4.11 | `POST /api/layers/compile` — пересборка слоёв | `src-tauri/src/agent/routes/` |
-| 4.12 | `GET /api/stats` — статистика базы | `src-tauri/src/agent/routes/` |
-| 4.13 | `GET /api/schema` — OpenAPI-совместимая схема | `src-tauri/src/agent/routes/` |
-| 4.14 | Settings UI: toggle Agent API, порт, токен, auto-approve | `src/components/Settings.tsx` |
-| 4.15 | IPC event при изменениях через Agent API → обновление карты в UI | integration |
-| 4.16 | Rate limiting: 100 req/sec | `src-tauri/src/agent/middleware.rs` |
+| 4.1 | ✅ HTTP-сервер внутри Tauri (axum, localhost-only) | `src-tauri/src/agent/server.rs` |
+| 4.2 | ✅ API token: генерация, хранение хеша в app_settings, проверка Bearer | `src-tauri/src/agent/auth.rs` |
+| 4.3 | ✅ SQLite WAL mode + connection pool (r2d2) для конкурентного доступа | `src-tauri/src/db/pool.rs` |
+| 4.4 | ✅ `GET /api/hint-types` — список типов | `src-tauri/src/agent/routes/` |
+| 4.5 | ✅ `GET /api/regions` — список регионов с фильтрацией | `src-tauri/src/agent/routes/` |
+| 4.6 | ✅ `GET /api/regions/:id` — регион с hints | `src-tauri/src/agent/routes/` |
+| 4.7 | ✅ `POST /api/hints` — создание одного hint | `src-tauri/src/agent/routes/` |
+| 4.8 | ✅ `POST /api/hints/batch` — массовое создание (до 10 000) | `src-tauri/src/agent/routes/` |
+| 4.9 | ✅ `POST /api/hints/by-country` — hint для всех регионов страны | `src-tauri/src/agent/routes/` |
+| 4.10 | ✅ `PUT /api/hints/:id`, `DELETE /api/hints/:id` | `src-tauri/src/agent/routes/` |
+| 4.11 | ✅ `POST /api/layers/compile` — пересборка слоёв | `src-tauri/src/agent/routes/` |
+| 4.12 | ✅ `GET /api/stats` — статистика базы | `src-tauri/src/agent/routes/` |
+| 4.13 | ✅ `GET /api/schema` — OpenAPI-совместимая схема | `src-tauri/src/agent/routes/` |
+| 4.14 | ✅ Settings UI: toggle Agent API, порт, токен, auto-approve | `src/components/Settings.tsx` |
+| 4.15 | ✅ IPC event при изменениях через Agent API → обновление карты в UI | integration |
+| 4.16 | ✅ Rate limiting: 100 req/sec | `src-tauri/src/agent/middleware.rs` |
 
 ### Тесты
 
 | Тип | Что тестируется |
 |-----|----------------|
-| Unit (Rust) | Auth: Bearer token verification, reject invalid |
-| Unit (Rust) | Batch hints: транзакционность (all-or-nothing) |
-| Unit (Rust) | Batch hints: валидация data_json по schema_json |
-| Unit (Rust) | Rate limiter: > 100 req/sec → 429 |
-| Integration (Rust) | GET /api/regions?country_code=IN → возвращает admin1 регионы |
-| Integration (Rust) | POST /api/hints/batch → 195 hints created, revision_log записан |
-| Integration (Rust) | POST /api/hints/by-country → hints для всех регионов страны |
-| Integration (Rust) | Concurrent: UI write + Agent batch → оба succeed (WAL) |
-| E2E | Включить Agent API в Settings → HTTP-сервер доступен на localhost |
-| E2E | curl POST /api/hints/batch → данные появляются на карте |
-| E2E | Невалидный токен → 401 |
+| Unit (Rust) | ✅ Auth: Bearer token verification, reject invalid |
+| Unit (Rust) | ✅ Batch hints: транзакционность (all-or-nothing) |
+| Unit (Rust) | ✅ Batch hints: валидация data_json по schema_json |
+| Unit (Rust) | ✅ Rate limiter: > 100 req/sec → 429 |
+| Integration (Rust) | ✅ Regions filter (country_code + region_level) возвращает admin1 регионы страны |
+| Integration (Rust) | ✅ Batch 195 driving_side: создаются hints + revision_log |
+| Integration (Rust) | ✅ By-country: hints создаются для всех регионов уровня в стране |
+| Integration (Rust) | ✅ Concurrent WAL: параллельная запись UI + batch API успешна |
+| E2E | ✅ Включение Agent API в Settings поднимает localhost-сервер |
+| E2E | ✅ Batch-запрос через Agent API отображается на карте после compile/refresh |
+| E2E | ✅ Невалидный токен → 401 |
+
+E2E пункты Phase 4 подтверждены ручной проверкой в dev-сборке.
 
 ### Gate Criteria
 
-- [ ] Agent API запускается и отвечает на localhost
-- [ ] `POST /api/hints/batch` с 195 записями driving_side выполняется < 5 секунд
-- [ ] Данные от агента видны на карте после `POST /api/layers/compile`
-- [ ] Concurrent доступ (UI + Agent) не вызывает ошибок
-- [ ] Невалидный data_json отклоняется с 400 и описанием ошибки
-- [ ] OpenAPI schema доступна на `GET /api/schema`
-- [ ] Все тесты проходят
+- [x] Agent API запускается и отвечает на localhost
+- [x] `POST /api/hints/batch` с 195 записями driving_side выполняется < 5 секунд
+- [x] Данные от агента видны на карте после `POST /api/layers/compile`
+- [x] Concurrent доступ (UI + Agent) не вызывает ошибок
+- [x] Невалидный data_json отклоняется с 400 и описанием ошибки
+- [x] OpenAPI schema доступна на `GET /api/schema`
+- [x] Все тесты проходят
 
 ---
 

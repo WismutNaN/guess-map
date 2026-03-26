@@ -1,5 +1,5 @@
-mod models;
-mod repository;
+pub(crate) mod models;
+pub(crate) mod repository;
 
 use crate::db::DbState;
 pub use models::{RegionInfo, RegionStats};

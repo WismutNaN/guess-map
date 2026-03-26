@@ -1,7 +1,7 @@
-mod models;
-mod repository;
-mod service;
-mod validator;
+pub(crate) mod models;
+pub(crate) mod repository;
+pub(crate) mod service;
+pub(crate) mod validator;
 
 use crate::compiler;
 use crate::db::DbState;

@@ -1,4 +1,5 @@
 pub mod migrations;
+pub mod pool;
 pub mod settings;
 
 use rusqlite::Connection;

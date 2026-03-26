@@ -30,3 +30,10 @@ geojson = "0.24"
 log = "0.4"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "gif", "bmp", "tiff"] }
 reqwest = { version = "0.12", default-features = false, features = ["native-tls", "blocking"] }
+axum = { version = "0.8", features = ["json", "http1"] }
+tokio = { version = "1", features = ["net", "time", "sync"] }
+r2d2 = "0.8"
+r2d2_sqlite = "0.24"
+rand = "0.8"
+sha2 = "0.10"
+subtle = "2.6"

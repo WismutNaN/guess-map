@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import maplibregl from "maplibre-gl";
 import { LayerPanel } from "./components/LayerPanel";
 import { MapView } from "./components/MapView";
 import { RegionInspector } from "./components/RegionInspector";
+import { Settings } from "./components/Settings";
 import { StatusBar } from "./components/StatusBar";
 import { Toolbar } from "./components/Toolbar";
 import { refreshHintTypeOnMap } from "./map/hintLayers";
@@ -21,6 +23,10 @@ interface RegionStats {
 
 type RoutesFilterMode = "all" | "selected_country";
 
+interface AgentApiDataChangedEvent {
+  hint_type_codes?: string[];
+}
+
 function App() {
   const [stats, setStats] = useState<RegionStats | null>(null);
   const [zoom, setZoom] = useState(2);
@@ -29,6 +35,7 @@ function App() {
   const [layerPanelVersion, setLayerPanelVersion] = useState(0);
   const [coverageOpacity, setCoverageOpacityState] = useState(DEFAULT_COVERAGE_OPACITY);
   const [routesFilterMode, setRoutesFilterMode] = useState<RoutesFilterMode>("all");
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const mapRef = useRef<maplibregl.Map | null>(null);
 
   useEffect(() => {
@@ -102,12 +109,40 @@ function App() {
     setLayerPanelVersion((version) => version + 1);
   }, []);
 
+  useEffect(() => {
+    let unlisten: (() => void) | null = null;
+
+    void listen<AgentApiDataChangedEvent>("agent-api:data-changed", (event) => {
+      const map = mapRef.current;
+      if (!map) {
+        setLayerPanelVersion((version) => version + 1);
+        return;
+      }
+
+      const codes = event.payload?.hint_type_codes ?? [];
+      for (const code of codes) {
+        void refreshHintTypeOnMap(map, code).catch((error) =>
+          console.error("Failed to refresh hint layer from agent event:", error)
+        );
+      }
+
+      setLayerPanelVersion((version) => version + 1);
+    }).then((dispose) => {
+      unlisten = dispose;
+    });
+
+    return () => {
+      unlisten?.();
+    };
+  }, []);
+
   return (
     <div className="app">
       <Toolbar
         mode={mode}
         onModeChange={setMode}
         onRegionSelect={handleSearchRegionSelect}
+        onOpenSettings={() => setSettingsOpen(true)}
       />
 
       <div className="map-wrapper">
@@ -137,6 +172,8 @@ function App() {
           onHintChanged={handleHintChanged}
         />
       )}
+
+      <Settings open={settingsOpen} onClose={() => setSettingsOpen(false)} />
 
       <StatusBar stats={stats} zoom={zoom} />
     </div>
