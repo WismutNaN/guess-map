@@ -119,6 +119,29 @@ body {
   z-index: 12;
 }
 
+.toolbar-display-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toolbar-select-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #9aa6d6;
+}
+
+.toolbar-select-wrap select {
+  background: #151b2e;
+  color: #edf1ff;
+  border: 1px solid #324066;
+  border-radius: 6px;
+  padding: 4px 7px;
+  font-size: 12px;
+}
+
 .toolbar-settings-button,
 .toolbar-history-button {
   background: #283453;
@@ -235,6 +258,44 @@ body {
   color: #d4daf4;
   backdrop-filter: blur(8px);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.debug-panel {
+  position: absolute;
+  left: 12px;
+  bottom: 40px;
+  z-index: 10;
+  min-width: 190px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #313a59;
+  background: rgba(30, 34, 52, 0.9);
+  color: #d4daf4;
+  backdrop-filter: blur(8px);
+}
+
+.debug-panel-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #98a5d4;
+  margin-bottom: 6px;
+}
+
+.debug-panel-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.debug-panel-item:last-child {
+  margin-bottom: 0;
+}
+
+.debug-panel-item input[type="checkbox"] {
+  accent-color: #7fa2ff;
 }
 
 .layer-panel-header {
@@ -1040,6 +1101,16 @@ body {
 
   .layer-panel {
     top: 58px;
+  }
+
+  .toolbar-display-controls {
+    display: none;
+  }
+
+  .debug-panel {
+    left: auto;
+    right: 12px;
+    bottom: 36px;
   }
 
   .change-log {

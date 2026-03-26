@@ -1,6 +1,7 @@
 import maplibregl from "maplibre-gl";
 import { invoke } from "@tauri-apps/api/core";
 import { registerLayerGroup } from "../layerManager";
+import { applySlotLayout, setSlotLayers } from "./slots";
 
 const SOURCE_ID = "hint-flags";
 const LAYER_ID = "hint-flags";
@@ -202,6 +203,8 @@ export async function addFlagLayer(map: maplibregl.Map) {
     });
   }
 
+  setSlotLayers(map, "flag", [{ layerId: LAYER_ID }]);
+  applySlotLayout(map);
   registerLayerGroup("flag", [LAYER_ID]);
 }
 
@@ -215,6 +218,7 @@ export async function refreshFlagLayer(map: maplibregl.Map) {
   bindStyleImageMissingHandler(map);
   preloadFlagImages(map, iconAssetIds);
   source.setData(data);
+  applySlotLayout(map);
 }
 
 export function setFlagMinConfidence(map: maplibregl.Map, minConfidence: number) {

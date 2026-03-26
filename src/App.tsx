@@ -8,6 +8,7 @@ import { refreshHintTypeOnMap } from "./map/hintLayers";
 import { setRoutesCountryFilter } from "./map/layers/routes";
 import { BulkActions } from "./components/BulkActions";
 import { ChangeLog } from "./components/ChangeLog";
+import { DebugPanel } from "./components/DebugPanel";
 import { LayerPanel } from "./components/LayerPanel";
 import { MapView } from "./components/MapView";
 import { RegionInspector } from "./components/RegionInspector";
@@ -113,6 +114,10 @@ function App() {
         onRegionSelect={handleSearchRegionSelect}
         onToggleHistory={() => setChangeLogOpen((o) => !o)}
         onOpenSettings={() => setSettingsOpen(true)}
+        densityPreset={layers.densityPreset}
+        onDensityPresetChange={layers.setDensityPreset}
+        presentationMode={layers.presentationMode}
+        onPresentationModeChange={layers.setPresentationMode}
       />
 
       <div className="map-wrapper">
@@ -141,6 +146,12 @@ function App() {
         selectedCountryCode={selection.selectedCountryCode}
         routesFilterMode={layers.routesFilterMode}
         onRoutesFilterModeChange={layers.setRoutesFilterMode}
+      />
+      <DebugPanel
+        showCollisionBoxes={layers.showCollisionBoxes}
+        showTileBoundaries={layers.showTileBoundaries}
+        onShowCollisionBoxesChange={layers.setShowCollisionBoxes}
+        onShowTileBoundariesChange={layers.setShowTileBoundaries}
       />
 
       {mode === "editor" && (

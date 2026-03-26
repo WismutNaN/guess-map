@@ -1,4 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
+import type { DensityPresetId } from "./presets";
+import type { PresentationMode } from "./presentation";
 
 interface MapPosition {
   lng: number;
@@ -13,6 +15,21 @@ const DEFAULT_POSITION: MapPosition = {
 };
 
 let saveTimeout: ReturnType<typeof setTimeout> | null = null;
+let displaySaveTimeout: ReturnType<typeof setTimeout> | null = null;
+
+export interface DisplaySettings {
+  densityPreset: DensityPresetId;
+  presentationMode: PresentationMode;
+  showCollisionBoxes: boolean;
+  showTileBoundaries: boolean;
+}
+
+const DEFAULT_DISPLAY_SETTINGS: DisplaySettings = {
+  densityPreset: "balanced",
+  presentationMode: "icons_text",
+  showCollisionBoxes: false,
+  showTileBoundaries: false,
+};
 
 export async function loadMapPosition(): Promise<MapPosition> {
   try {
@@ -61,4 +78,88 @@ export function saveMapPosition(lng: number, lat: number, zoom: number) {
       console.warn("Failed to save map position:", e);
     }
   }, 1000);
+}
+
+function parseDensityPreset(raw: string): DensityPresetId {
+  if (raw === "minimal" || raw === "balanced" || raw === "dense" || raw === "study") {
+    return raw;
+  }
+  return DEFAULT_DISPLAY_SETTINGS.densityPreset;
+}
+
+function parsePresentationMode(raw: string): PresentationMode {
+  if (raw === "icons_only" || raw === "icons_text" || raw === "icons_thumbnails") {
+    return raw;
+  }
+  return DEFAULT_DISPLAY_SETTINGS.presentationMode;
+}
+
+function parseBool(raw: string): boolean {
+  const value = raw.trim().toLowerCase();
+  return value === "1" || value === "true" || value === "yes" || value === "on";
+}
+
+export async function loadDisplaySettings(): Promise<DisplaySettings> {
+  try {
+    const densityPreset = parseDensityPreset(
+      await invoke<string>("get_setting_or", {
+        key: "map.density_preset",
+        default: DEFAULT_DISPLAY_SETTINGS.densityPreset,
+      })
+    );
+    const presentationMode = parsePresentationMode(
+      await invoke<string>("get_setting_or", {
+        key: "map.presentation_mode",
+        default: DEFAULT_DISPLAY_SETTINGS.presentationMode,
+      })
+    );
+    const showCollisionBoxes = parseBool(
+      await invoke<string>("get_setting_or", {
+        key: "map.debug.show_collision_boxes",
+        default: "0",
+      })
+    );
+    const showTileBoundaries = parseBool(
+      await invoke<string>("get_setting_or", {
+        key: "map.debug.show_tile_boundaries",
+        default: "0",
+      })
+    );
+
+    return {
+      densityPreset,
+      presentationMode,
+      showCollisionBoxes,
+      showTileBoundaries,
+    };
+  } catch (error) {
+    console.warn("Failed to load display settings, using defaults:", error);
+    return DEFAULT_DISPLAY_SETTINGS;
+  }
+}
+
+export function saveDisplaySettings(settings: DisplaySettings) {
+  if (displaySaveTimeout) clearTimeout(displaySaveTimeout);
+  displaySaveTimeout = setTimeout(async () => {
+    try {
+      await invoke("set_setting", {
+        key: "map.density_preset",
+        value: settings.densityPreset,
+      });
+      await invoke("set_setting", {
+        key: "map.presentation_mode",
+        value: settings.presentationMode,
+      });
+      await invoke("set_setting", {
+        key: "map.debug.show_collision_boxes",
+        value: settings.showCollisionBoxes ? "1" : "0",
+      });
+      await invoke("set_setting", {
+        key: "map.debug.show_tile_boundaries",
+        value: settings.showTileBoundaries ? "1" : "0",
+      });
+    } catch (error) {
+      console.warn("Failed to save display settings:", error);
+    }
+  }, 400);
 }

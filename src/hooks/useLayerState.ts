@@ -10,7 +10,23 @@ import {
 } from "../map/layers/flags";
 import { setRoutesCountryFilter } from "../map/layers/routes";
 import { setEmptyRegionFilter } from "../map/layers/regions";
+import { applySlotLayout, setSlotLayoutScale } from "../map/layers/slots";
 import { setThematicHintSizeScale } from "../map/layers/thematicHints";
+import { applyDebugOverlayOptions } from "../map/debug";
+import {
+  loadDisplaySettings,
+  saveDisplaySettings,
+} from "../map/persistence";
+import {
+  applyDensityPreset,
+  DEFAULT_DENSITY_PRESET,
+  type DensityPresetId,
+} from "../map/presets";
+import {
+  applyPresentationMode,
+  DEFAULT_PRESENTATION_MODE,
+  type PresentationMode,
+} from "../map/presentation";
 import type { EmptyRegionFilterInfo } from "../types";
 
 export type RoutesFilterMode = "all" | "selected_country";
@@ -19,6 +35,10 @@ export interface LayerState {
   coverageOpacity: number;
   flagSizeScale: number;
   minConfidence: number;
+  densityPreset: DensityPresetId;
+  presentationMode: PresentationMode;
+  showCollisionBoxes: boolean;
+  showTileBoundaries: boolean;
   emptyFilterHintType: string;
   showEmptyRegions: boolean;
   routesFilterMode: RoutesFilterMode;
@@ -30,6 +50,10 @@ export interface LayerState {
   setCoverageOpacity: (opacity: number) => void;
   setFlagSizeScale: (scale: number) => void;
   setMinConfidence: (value: number) => void;
+  setDensityPreset: (preset: DensityPresetId) => void;
+  setPresentationMode: (mode: PresentationMode) => void;
+  setShowCollisionBoxes: (enabled: boolean) => void;
+  setShowTileBoundaries: (enabled: boolean) => void;
   setEmptyFilterHintType: (code: string) => void;
   setShowEmptyRegions: (enabled: boolean) => void;
   setRoutesFilterMode: (mode: RoutesFilterMode) => void;
@@ -48,6 +72,15 @@ export function useLayerState(): LayerState {
   const [coverageOpacity, setCoverageOpacityVal] = useState(DEFAULT_COVERAGE_OPACITY);
   const [flagSizeScale, setFlagSizeScaleVal] = useState(DEFAULT_FLAG_SIZE_SCALE);
   const [minConfidence, setMinConfidenceVal] = useState(0);
+  const [densityPreset, setDensityPreset] = useState<DensityPresetId>(
+    DEFAULT_DENSITY_PRESET
+  );
+  const [presentationMode, setPresentationMode] = useState<PresentationMode>(
+    DEFAULT_PRESENTATION_MODE
+  );
+  const [showCollisionBoxes, setShowCollisionBoxes] = useState(false);
+  const [showTileBoundaries, setShowTileBoundaries] = useState(false);
+  const [displaySettingsLoaded, setDisplaySettingsLoaded] = useState(false);
   const [emptyFilterHintType, setEmptyFilterHintType] = useState("");
   const [showEmptyRegions, setShowEmptyRegions] = useState(false);
   const [routesFilterMode, setRoutesFilterMode] = useState<RoutesFilterMode>("all");
@@ -63,11 +96,25 @@ export function useLayerState(): LayerState {
     setRevisionSignal((v) => v + 1);
   }, []);
 
+  const applyDisplaySettingsToMap = useCallback(
+    (map: maplibregl.Map) => {
+      applyDensityPreset(map, densityPreset);
+      applyPresentationMode(map, presentationMode, densityPreset);
+      applyDebugOverlayOptions(map, {
+        showCollisionBoxes,
+        showTileBoundaries,
+      });
+    },
+    [densityPreset, presentationMode, showCollisionBoxes, showTileBoundaries]
+  );
+
   const toggleLayer = useCallback((code: string, visible: boolean) => {
     if (mapRef.current) {
       setLayerGroupVisibility(mapRef.current, code, visible);
+      applySlotLayout(mapRef.current);
+      applyDisplaySettingsToMap(mapRef.current);
     }
-  }, []);
+  }, [applyDisplaySettingsToMap]);
 
   const handleCoverageOpacity = useCallback((opacity: number) => {
     setCoverageOpacityVal(opacity);
@@ -79,6 +126,8 @@ export function useLayerState(): LayerState {
     if (!mapRef.current) return;
     setFlagSizeScale(mapRef.current, scale);
     setThematicHintSizeScale(mapRef.current, scale);
+    setSlotLayoutScale(mapRef.current, scale);
+    applySlotLayout(mapRef.current);
   }, []);
 
   const onHintChanged = useCallback(
@@ -88,10 +137,12 @@ export function useLayerState(): LayerState {
         void refreshHintTypeOnMap(map, hintTypeCode).catch((err) =>
           console.error("Failed to refresh hint layer:", err)
         );
+        applySlotLayout(map);
+        applyDisplaySettingsToMap(map);
       }
       bumpRefresh();
     },
-    [bumpRefresh]
+    [applyDisplaySettingsToMap, bumpRefresh]
   );
 
   const initMap = useCallback(
@@ -101,11 +152,17 @@ export function useLayerState(): LayerState {
       setCoverageOpacity(map, coverageOpacity);
       setFlagSizeScale(map, flagSizeScale);
       setThematicHintSizeScale(map, flagSizeScale);
+      setSlotLayoutScale(map, flagSizeScale);
+      applySlotLayout(map);
+      applyDisplaySettingsToMap(map);
       setRefreshSignal((v) => v + 1);
     },
-    // Intentionally capture initial values only — sync effects handle updates
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    []
+    [
+      applyDisplaySettingsToMap,
+      coverageOpacity,
+      flagSizeScale,
+      minConfidence,
+    ]
   );
 
   const syncRoutesFilter = useCallback((countryCode: string | null) => {
@@ -120,11 +177,58 @@ export function useLayerState(): LayerState {
     if (mapRef.current) applyMinConfidenceFilter(mapRef.current, minConfidence);
   }, [minConfidence]);
 
+  // Load persisted display settings once.
+  useEffect(() => {
+    let cancelled = false;
+    void loadDisplaySettings()
+      .then((settings) => {
+        if (cancelled) return;
+        setDensityPreset(settings.densityPreset);
+        setPresentationMode(settings.presentationMode);
+        setShowCollisionBoxes(settings.showCollisionBoxes);
+        setShowTileBoundaries(settings.showTileBoundaries);
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setDisplaySettingsLoaded(true);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Persist display settings.
+  useEffect(() => {
+    if (!displaySettingsLoaded) return;
+    saveDisplaySettings({
+      densityPreset,
+      presentationMode,
+      showCollisionBoxes,
+      showTileBoundaries,
+    });
+  }, [
+    densityPreset,
+    displaySettingsLoaded,
+    presentationMode,
+    showCollisionBoxes,
+    showTileBoundaries,
+  ]);
+
+  // Apply display settings to map.
+  useEffect(() => {
+    if (!mapRef.current) return;
+    applyDisplaySettingsToMap(mapRef.current);
+  }, [applyDisplaySettingsToMap]);
+
   // Sync flag icon size to map
   useEffect(() => {
     if (!mapRef.current) return;
     setFlagSizeScale(mapRef.current, flagSizeScale);
     setThematicHintSizeScale(mapRef.current, flagSizeScale);
+    setSlotLayoutScale(mapRef.current, flagSizeScale);
+    applySlotLayout(mapRef.current);
   }, [flagSizeScale]);
 
   // Sync empty region filter to map
@@ -155,6 +259,10 @@ export function useLayerState(): LayerState {
     coverageOpacity,
     flagSizeScale,
     minConfidence,
+    densityPreset,
+    presentationMode,
+    showCollisionBoxes,
+    showTileBoundaries,
     emptyFilterHintType,
     showEmptyRegions,
     routesFilterMode,
@@ -164,6 +272,10 @@ export function useLayerState(): LayerState {
     setCoverageOpacity: handleCoverageOpacity,
     setFlagSizeScale: handleFlagSizeScale,
     setMinConfidence: setMinConfidenceVal,
+    setDensityPreset,
+    setPresentationMode,
+    setShowCollisionBoxes,
+    setShowTileBoundaries,
     setEmptyFilterHintType,
     setShowEmptyRegions,
     setRoutesFilterMode,
