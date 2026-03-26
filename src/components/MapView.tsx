@@ -4,30 +4,30 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { createBaseMapStyle } from "../map/baseStyle";
 import { bootstrapMapLayers } from "../map/bootstrapLayers";
 import { bindRegionSelection } from "../map/interaction";
-import { addSelectionLayers, setSelectedRegion } from "../map/layers";
+import { addSelectionLayers, setSelectedRegions } from "../map/layers";
 import { loadMapPosition, saveMapPosition } from "../map/persistence";
 import type { RegionInfo } from "../types";
 
 interface MapViewProps {
   editorMode: boolean;
-  selectedRegion: RegionInfo | null;
-  onRegionSelect: (region: RegionInfo | null) => void;
+  selectedRegions: RegionInfo[];
+  onSelectionChange: (regions: RegionInfo[], activeRegion: RegionInfo | null) => void;
   onZoomChange?: (zoom: number) => void;
   onMapReady?: (map: maplibregl.Map) => void;
 }
 
 export function MapView({
   editorMode,
-  selectedRegion,
-  onRegionSelect,
+  selectedRegions,
+  onSelectionChange,
   onZoomChange,
   onMapReady,
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const editorModeRef = useRef(editorMode);
-  const selectedRegionRef = useRef<RegionInfo | null>(selectedRegion);
-  const onRegionSelectRef = useRef(onRegionSelect);
+  const selectedRegionsRef = useRef<RegionInfo[]>(selectedRegions);
+  const onSelectionChangeRef = useRef(onSelectionChange);
   const onZoomChangeRef = useRef(onZoomChange);
   const onMapReadyRef = useRef(onMapReady);
   const unbindSelectionRef = useRef<(() => void) | null>(null);
@@ -37,8 +37,8 @@ export function MapView({
   }, [editorMode]);
 
   useEffect(() => {
-    onRegionSelectRef.current = onRegionSelect;
-  }, [onRegionSelect]);
+    onSelectionChangeRef.current = onSelectionChange;
+  }, [onSelectionChange]);
 
   useEffect(() => {
     onZoomChangeRef.current = onZoomChange;
@@ -49,11 +49,11 @@ export function MapView({
   }, [onMapReady]);
 
   useEffect(() => {
-    selectedRegionRef.current = selectedRegion;
+    selectedRegionsRef.current = selectedRegions;
     if (mapRef.current) {
-      setSelectedRegion(mapRef.current, selectedRegion);
+      setSelectedRegions(mapRef.current, selectedRegions);
     }
-  }, [selectedRegion]);
+  }, [selectedRegions]);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -68,6 +68,7 @@ export function MapView({
         zoom: saved.zoom,
         maxZoom: 18,
         minZoom: 1,
+        boxZoom: false,
         // We add a single compact attribution control manually below.
         attributionControl: false,
       });
@@ -82,11 +83,13 @@ export function MapView({
         await bootstrapMapLayers(map);
 
         addSelectionLayers(map);
-        setSelectedRegion(map, selectedRegionRef.current);
+        setSelectedRegions(map, selectedRegionsRef.current);
 
         unbindSelectionRef.current = bindRegionSelection(map, {
           isEnabled: () => editorModeRef.current,
-          onRegionSelected: (region) => onRegionSelectRef.current(region),
+          getSelectedRegions: () => selectedRegionsRef.current,
+          onSelectionChange: (regions, activeRegion) =>
+            onSelectionChangeRef.current(regions, activeRegion),
         });
 
         onMapReadyRef.current?.(map);

@@ -17,6 +17,8 @@ pub async fn get_schema() -> Json<Value> {
         "/api/hints/batch": { "post": {} },
         "/api/hints/by-country": { "post": {} },
         "/api/hints/{id}": { "put": {}, "delete": {} },
+        "/api/assets": { "post": {} },
+        "/api/assets/{id}": { "get": {} },
         "/api/layers/compile": { "post": {} },
         "/api/stats": { "get": {} },
         "/api/schema": { "get": {} }

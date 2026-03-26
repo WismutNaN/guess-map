@@ -48,6 +48,7 @@ export function OverlaySection({
           <input
             className="overlay-slider"
             type="range"
+            aria-label="Coverage opacity"
             min={20}
             max={100}
             step={1}

@@ -1,5 +1,5 @@
 mod models;
-mod service;
+pub(crate) mod service;
 
 use crate::db::DbState;
 pub use models::{AssetInfo, UploadAssetInput};

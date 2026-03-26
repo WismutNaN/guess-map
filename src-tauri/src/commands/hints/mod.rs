@@ -5,7 +5,10 @@ pub(crate) mod validator;
 
 use crate::compiler;
 use crate::db::DbState;
-pub use models::{CreateHintInput, HintTypeInfo, RegionHintInfo, UpdateHintInput};
+pub use models::{
+    BatchCreateHintsInput, BatchDeleteHintsInput, BatchMutationResult, CreateHintInput,
+    EmptyRegionFilterInfo, HintTypeInfo, RegionHintInfo, UpdateHintInput,
+};
 use tauri::State;
 
 /// Get all hint types.
@@ -72,6 +75,35 @@ pub fn delete_hint(
     service::delete_hint(&mut conn, &hint_id, created_by)
 }
 
+#[tauri::command]
+pub fn batch_create_hints(
+    db: State<'_, DbState>,
+    input: BatchCreateHintsInput,
+) -> Result<BatchMutationResult, String> {
+    let mut conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let affected = service::batch_create_hints(&mut conn, input)?;
+    Ok(BatchMutationResult { affected })
+}
+
+#[tauri::command]
+pub fn batch_delete_hints(
+    db: State<'_, DbState>,
+    input: BatchDeleteHintsInput,
+) -> Result<BatchMutationResult, String> {
+    let mut conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let affected = service::batch_delete_hints(&mut conn, input)?;
+    Ok(BatchMutationResult { affected })
+}
+
+#[tauri::command]
+pub fn get_empty_region_filter(
+    db: State<'_, DbState>,
+    hint_type_code: String,
+) -> Result<EmptyRegionFilterInfo, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    repository::list_empty_region_filter(&conn, &hint_type_code)
+}
+
 /// Compile a hint layer to GeoJSON (point source).
 #[tauri::command]
 pub fn compile_hint_layer(
@@ -112,6 +144,7 @@ mod tests {
     use crate::seed::hint_types;
     use rusqlite::Connection;
     use serde_json::json;
+    use uuid::Uuid;
 
     fn setup_conn() -> Connection {
         let db = DbState::new_in_memory().unwrap();
@@ -135,6 +168,24 @@ mod tests {
             |row| row.get(0),
         )
         .unwrap()
+    }
+
+    fn create_admin1(conn: &Connection, country_code: &str, geometry_ref: &str, name: &str) -> String {
+        let country_id: String = conn
+            .query_row(
+                "SELECT id FROM region WHERE country_code = ?1 AND region_level = 'country'",
+                [country_code],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let region_id = Uuid::new_v4().to_string();
+        conn.execute(
+            "INSERT INTO region (id, name, name_en, country_code, region_level, parent_id, geometry_ref, anchor_lng, anchor_lat)
+             VALUES (?1, ?2, ?2, ?3, 'admin1', ?4, ?5, 77.0, 12.0)",
+            rusqlite::params![region_id, name, country_code, country_id, geometry_ref],
+        )
+        .unwrap();
+        region_id
     }
 
     #[test]
@@ -281,6 +332,114 @@ mod tests {
             )
             .unwrap();
         assert_eq!(delete_logs, 1);
+    }
+
+    #[test]
+    fn test_batch_create_hints_writes_revisions() {
+        let mut conn = setup_conn();
+        let country_region = region_id(&conn, "IN");
+        let admin_region = create_admin1(&conn, "IN", "admin1:IN-KA", "Karnataka");
+
+        let affected = service::batch_create_hints(
+            &mut conn,
+            BatchCreateHintsInput {
+                region_ids: vec![country_region.clone(), admin_region.clone()],
+                hint_type_code: "note".to_string(),
+                short_value: Some("Batch note".to_string()),
+                full_value: None,
+                data_json: None,
+                color: None,
+                confidence: Some(0.9),
+                min_zoom: Some(2.0),
+                max_zoom: Some(9.0),
+                is_visible: Some(true),
+                image_asset_id: None,
+                icon_asset_id: None,
+                source_note: Some("batch".to_string()),
+                created_by: Some("user".to_string()),
+            },
+        )
+        .unwrap();
+
+        assert_eq!(affected, 2);
+
+        let hints_count: usize = conn
+            .query_row(
+                "SELECT COUNT(*)
+                 FROM region_hint rh
+                 JOIN hint_type ht ON rh.hint_type_id = ht.id
+                 WHERE ht.code = 'note'
+                   AND rh.region_id IN (?1, ?2)",
+                rusqlite::params![country_region, admin_region],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(hints_count, 2);
+
+        let create_logs: usize = conn
+            .query_row(
+                "SELECT COUNT(*)
+                 FROM revision_log
+                 WHERE entity_type='region_hint'
+                   AND action='create'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(create_logs, 2);
+    }
+
+    #[test]
+    fn test_batch_delete_hints_removes_target_type() {
+        let mut conn = setup_conn();
+        let country_region = region_id(&conn, "IN");
+        let admin_region = create_admin1(&conn, "IN", "admin1:IN-TN", "Tamil Nadu");
+
+        let _ = service::batch_create_hints(
+            &mut conn,
+            BatchCreateHintsInput {
+                region_ids: vec![country_region.clone(), admin_region.clone()],
+                hint_type_code: "note".to_string(),
+                short_value: Some("to-remove".to_string()),
+                full_value: None,
+                data_json: None,
+                color: None,
+                confidence: Some(1.0),
+                min_zoom: None,
+                max_zoom: None,
+                is_visible: Some(true),
+                image_asset_id: None,
+                icon_asset_id: None,
+                source_note: None,
+                created_by: Some("user".to_string()),
+            },
+        )
+        .unwrap();
+
+        let affected = service::batch_delete_hints(
+            &mut conn,
+            BatchDeleteHintsInput {
+                region_ids: vec![country_region.clone(), admin_region.clone()],
+                hint_type_code: "note".to_string(),
+                created_by: Some("user".to_string()),
+            },
+        )
+        .unwrap();
+
+        assert_eq!(affected, 2);
+
+        let remaining: usize = conn
+            .query_row(
+                "SELECT COUNT(*)
+                 FROM region_hint rh
+                 JOIN hint_type ht ON rh.hint_type_id = ht.id
+                 WHERE ht.code = 'note'
+                   AND rh.region_id IN (?1, ?2)",
+                rusqlite::params![country_region, admin_region],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(remaining, 0);
     }
 
     #[test]

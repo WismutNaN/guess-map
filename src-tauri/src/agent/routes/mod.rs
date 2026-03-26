@@ -1,3 +1,4 @@
+mod assets;
 mod error;
 mod helpers;
 mod hint_types;
@@ -28,6 +29,8 @@ pub fn build_router(state: AgentApiContext) -> Router {
             "/api/hints/{id}",
             put(hints::update_hint).delete(hints::delete_hint),
         )
+        .route("/api/assets", post(assets::upload_asset))
+        .route("/api/assets/{id}", get(assets::get_asset))
         .route("/api/layers/compile", post(layers::compile_layers))
         .route("/api/stats", get(stats::get_stats))
         .route("/api/schema", get(schema::get_schema))

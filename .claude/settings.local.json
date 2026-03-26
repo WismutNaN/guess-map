@@ -31,7 +31,10 @@
       "Bash(cargo build:*)",
       "Bash(node -e \"const pkg = require\\(''./node_modules/maplibre-gl/package.json''\\); console.log\\(''maplibre-gl version:'', pkg.version\\)\")",
       "Bash(rtk npm:*)",
-      "Bash(npm ls:*)"
+      "Bash(npm ls:*)",
+      "Bash(xargs grep:*)",
+      "Bash(node scripts/gm-agent.mjs)",
+      "Bash(GM_API_TOKEN=test node scripts/gm-agent.mjs help)"
     ]
   }
 }

@@ -1,17 +1,20 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
 import type { RegionHintInfo, RegionInfo } from "../types";
+import { BulkActions } from "./BulkActions";
 import { HintForm } from "./HintForm";
 
 interface RegionInspectorProps {
   region: RegionInfo | null;
-  onDeselect: () => void;
+  selectedRegions: RegionInfo[];
+  onSelectionChange: (regions: RegionInfo[], activeRegion: RegionInfo | null) => void;
   onHintChanged: (hintTypeCode: string) => void;
 }
 
 export function RegionInspector({
   region,
-  onDeselect,
+  selectedRegions,
+  onSelectionChange,
   onHintChanged,
 }: RegionInspectorProps) {
   const [hints, setHints] = useState<RegionHintInfo[]>([]);
@@ -75,7 +78,34 @@ export function RegionInspector({
         <button type="button" onClick={() => setIsAdding(true)}>
           Add hint
         </button>
-        <button type="button" onClick={onDeselect}>
+        <button
+          type="button"
+          onClick={() => {
+            if (!region.country_code) {
+              return;
+            }
+            const regionLevel =
+              region.region_level === "country" ? "admin1" : region.region_level;
+            void invoke<RegionInfo[]>("list_regions_by_country", {
+              countryCode: region.country_code,
+              regionLevel,
+            })
+              .then((regions) => {
+                if (regions.length === 0) {
+                  return;
+                }
+                const active =
+                  regions.find((candidate) => candidate.id === region.id) ?? regions[0];
+                onSelectionChange(regions, active ?? null);
+              })
+              .catch((error) =>
+                console.error("Failed to select regions by country:", error)
+              );
+          }}
+        >
+          Select all in country
+        </button>
+        <button type="button" onClick={() => onSelectionChange([], null)}>
           Deselect
         </button>
       </div>
@@ -141,6 +171,12 @@ export function RegionInspector({
             </div>
           ))}
       </div>
+
+      <BulkActions
+        selectedRegions={selectedRegions}
+        onClearSelection={() => onSelectionChange([], null)}
+        onHintChanged={onHintChanged}
+      />
     </aside>
   );
 }

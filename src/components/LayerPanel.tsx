@@ -12,6 +12,12 @@ interface LayerPanelProps {
   refreshSignal?: number;
   coverageOpacity?: number;
   onCoverageOpacityChange?: (opacity: number) => void;
+  minConfidence?: number;
+  onMinConfidenceChange?: (value: number) => void;
+  emptyFilterHintType?: string;
+  onEmptyFilterHintTypeChange?: (hintTypeCode: string) => void;
+  showEmptyRegions?: boolean;
+  onShowEmptyRegionsChange?: (enabled: boolean) => void;
   routesFilterMode?: "all" | "selected_country";
   selectedCountryCode?: string | null;
   onRoutesFilterModeChange?: (mode: "all" | "selected_country") => void;
@@ -22,6 +28,12 @@ export function LayerPanel({
   refreshSignal = 0,
   coverageOpacity = DEFAULT_COVERAGE_OPACITY,
   onCoverageOpacityChange,
+  minConfidence = 0,
+  onMinConfidenceChange,
+  emptyFilterHintType = "",
+  onEmptyFilterHintTypeChange,
+  showEmptyRegions = false,
+  onShowEmptyRegionsChange,
   routesFilterMode = "all",
   selectedCountryCode,
   onRoutesFilterModeChange,
@@ -33,10 +45,28 @@ export function LayerPanel({
   const [coverageOpacityLocal, setCoverageOpacityLocal] = useState(
     Math.round(coverageOpacity * 100)
   );
+  const [minConfidenceLocal, setMinConfidenceLocal] = useState(
+    Math.round(minConfidence * 100)
+  );
+  const [emptyFilterHintTypeLocal, setEmptyFilterHintTypeLocal] =
+    useState(emptyFilterHintType);
+  const [showEmptyRegionsLocal, setShowEmptyRegionsLocal] = useState(showEmptyRegions);
 
   useEffect(() => {
     setCoverageOpacityLocal(Math.round(coverageOpacity * 100));
   }, [coverageOpacity]);
+
+  useEffect(() => {
+    setMinConfidenceLocal(Math.round(minConfidence * 100));
+  }, [minConfidence]);
+
+  useEffect(() => {
+    setEmptyFilterHintTypeLocal(emptyFilterHintType);
+  }, [emptyFilterHintType]);
+
+  useEffect(() => {
+    setShowEmptyRegionsLocal(showEmptyRegions);
+  }, [showEmptyRegions]);
 
   useEffect(() => {
     let cancelled = false;
@@ -107,6 +137,58 @@ export function LayerPanel({
             visibility={visibility}
             onToggle={handleToggle}
           />
+          <div className="layer-section-label">Filters</div>
+          <div className="overlay-filter-block">
+            <label className="overlay-filter-checkbox">
+              <input
+                type="checkbox"
+                checked={showEmptyRegionsLocal}
+                onChange={(event) => {
+                  const enabled = event.target.checked;
+                  setShowEmptyRegionsLocal(enabled);
+                  onShowEmptyRegionsChange?.(enabled);
+                }}
+              />
+              Empty regions
+            </label>
+            <select
+              className="overlay-filter-select"
+              value={emptyFilterHintTypeLocal}
+              onChange={(event) => {
+                const next = event.target.value;
+                setEmptyFilterHintTypeLocal(next);
+                onEmptyFilterHintTypeChange?.(next);
+              }}
+            >
+              <option value="">Select hint type</option>
+              {hintTypes.map((hintType) => (
+                <option key={hintType.id} value={hintType.code}>
+                  {hintType.title}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="overlay-slider-block">
+            <div className="overlay-slider-label">
+              Min confidence
+              <span>{minConfidenceLocal}%</span>
+            </div>
+            <input
+              className="overlay-slider"
+              type="range"
+              aria-label="Minimum confidence"
+              min={0}
+              max={100}
+              step={1}
+              value={minConfidenceLocal}
+              onChange={(event) => {
+                const raw = Number.parseInt(event.target.value, 10);
+                setMinConfidenceLocal(raw);
+                onMinConfidenceChange?.(raw / 100);
+              }}
+            />
+          </div>
         </div>
       )}
     </div>

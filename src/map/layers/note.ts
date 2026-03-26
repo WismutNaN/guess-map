@@ -65,3 +65,20 @@ export async function refreshNoteLayer(map: maplibregl.Map) {
   const data = await loadNoteGeoJson();
   source.setData(data);
 }
+
+export function setNoteMinConfidence(map: maplibregl.Map, minConfidence: number) {
+  if (!map.getLayer(LAYER_ID)) {
+    return;
+  }
+
+  if (minConfidence <= 0) {
+    map.setFilter(LAYER_ID, null);
+    return;
+  }
+
+  map.setFilter(LAYER_ID, [
+    ">=",
+    ["coalesce", ["get", "confidence"], 0],
+    minConfidence,
+  ]);
+}

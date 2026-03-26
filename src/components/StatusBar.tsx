@@ -7,9 +7,10 @@ interface RegionStats {
 interface StatusBarProps {
   stats: RegionStats | null;
   zoom: number;
+  selectedCount: number;
 }
 
-export function StatusBar({ stats, zoom }: StatusBarProps) {
+export function StatusBar({ stats, zoom, selectedCount }: StatusBarProps) {
   return (
     <div className="status-bar">
       {stats && (
@@ -28,6 +29,10 @@ export function StatusBar({ stats, zoom }: StatusBarProps) {
           </div>
         </>
       )}
+      <div className="stat">
+        <span className="stat-label">Selected:</span>
+        <span className="stat-value">{selectedCount}</span>
+      </div>
       <div className="zoom-info">Zoom: {zoom.toFixed(1)}</div>
     </div>
   );

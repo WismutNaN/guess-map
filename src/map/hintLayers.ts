@@ -1,8 +1,8 @@
 import maplibregl from "maplibre-gl";
 import { refreshDrivingSideLayer } from "./layers/drivingSide";
-import { refreshFlagLayer } from "./layers/flags";
-import { refreshNoteLayer } from "./layers/note";
-import { refreshRouteLayers } from "./layers/routes";
+import { refreshFlagLayer, setFlagMinConfidence } from "./layers/flags";
+import { refreshNoteLayer, setNoteMinConfidence } from "./layers/note";
+import { refreshRouteLayers, setRoutesMinConfidence } from "./layers/routes";
 
 export async function refreshHintTypeOnMap(
   map: maplibregl.Map,
@@ -26,4 +26,11 @@ export async function refreshHintTypeOnMap(
   if (hintTypeCode === "highway") {
     await refreshRouteLayers(map);
   }
+}
+
+export function applyMinConfidenceFilter(map: maplibregl.Map, minConfidence: number) {
+  const normalized = Math.max(0, Math.min(1, minConfidence));
+  setFlagMinConfidence(map, normalized);
+  setNoteMinConfidence(map, normalized);
+  setRoutesMinConfidence(map, normalized);
 }

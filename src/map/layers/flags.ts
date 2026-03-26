@@ -65,6 +65,23 @@ export async function refreshFlagLayer(map: maplibregl.Map) {
   source.setData(data);
 }
 
+export function setFlagMinConfidence(map: maplibregl.Map, minConfidence: number) {
+  if (!map.getLayer(LAYER_ID)) {
+    return;
+  }
+
+  if (minConfidence <= 0) {
+    map.setFilter(LAYER_ID, null);
+    return;
+  }
+
+  map.setFilter(LAYER_ID, [
+    ">=",
+    ["coalesce", ["get", "confidence"], 0],
+    minConfidence,
+  ]);
+}
+
 async function loadFlagGeoJson() {
   const geojsonStr = await invoke<string>("compile_hint_layer", {
     hintTypeCode: "flag",

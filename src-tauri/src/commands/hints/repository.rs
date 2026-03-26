@@ -1,6 +1,8 @@
-use super::models::{HintRecord, HintTypeInfo, HintTypeMeta, RegionHintInfo};
+use super::models::{
+    EmptyRegionFilterInfo, HintRecord, HintTypeInfo, HintTypeMeta, RegionHintInfo,
+};
 use rusqlite::{Connection, OptionalExtension};
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 
 pub(crate) fn list_hint_types(conn: &Connection) -> Result<Vec<HintTypeInfo>, String> {
     let mut stmt = conn
@@ -176,6 +178,67 @@ pub(crate) fn load_hint_type_meta(
     .optional()
     .map_err(|e| e.to_string())?
     .ok_or_else(|| format!("Hint type '{}' not found or inactive", hint_type_code))
+}
+
+pub(crate) fn list_empty_region_filter(
+    conn: &Connection,
+    hint_type_code: &str,
+) -> Result<EmptyRegionFilterInfo, String> {
+    let mut stmt = conn
+        .prepare(
+            "SELECT r.region_level, r.country_code, r.geometry_ref
+             FROM region r
+             WHERE r.is_active = 1
+               AND r.region_level IN ('country', 'admin1')
+               AND NOT EXISTS (
+                   SELECT 1
+                   FROM region_hint rh
+                   JOIN hint_type ht ON rh.hint_type_id = ht.id
+                   WHERE rh.region_id = r.id
+                     AND ht.code = ?1
+               )",
+        )
+        .map_err(|e| e.to_string())?;
+
+    let mut country_codes = BTreeSet::new();
+    let mut admin1_codes = BTreeSet::new();
+
+    stmt.query_map([hint_type_code], |row| {
+        let region_level: String = row.get(0)?;
+        let country_code: Option<String> = row.get(1)?;
+        let geometry_ref: Option<String> = row.get(2)?;
+        Ok((region_level, country_code, geometry_ref))
+    })
+    .map_err(|e| e.to_string())?
+    .filter_map(|r| r.ok())
+    .for_each(|(region_level, country_code, geometry_ref)| {
+        if region_level == "country" {
+            if let Some(code) = country_code {
+                let normalized = code.trim();
+                if !normalized.is_empty() {
+                    country_codes.insert(normalized.to_string());
+                }
+            }
+            return;
+        }
+
+        if region_level == "admin1" {
+            let code = geometry_ref
+                .as_deref()
+                .and_then(|value| value.strip_prefix("admin1:"))
+                .map(str::trim);
+            if let Some(code) = code {
+                if !code.is_empty() {
+                    admin1_codes.insert(code.to_string());
+                }
+            }
+        }
+    });
+
+    Ok(EmptyRegionFilterInfo {
+        country_codes: country_codes.into_iter().collect(),
+        admin1_codes: admin1_codes.into_iter().collect(),
+    })
 }
 
 fn row_to_hint_info(row: &rusqlite::Row<'_>) -> rusqlite::Result<RegionHintInfo> {

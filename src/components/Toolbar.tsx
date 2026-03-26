@@ -5,6 +5,7 @@ interface ToolbarProps {
   mode: AppMode;
   onModeChange: (mode: AppMode) => void;
   onRegionSelect: (region: RegionInfo) => void;
+  onToggleHistory: () => void;
   onOpenSettings: () => void;
 }
 
@@ -12,6 +13,7 @@ export function Toolbar({
   mode,
   onModeChange,
   onRegionSelect,
+  onToggleHistory,
   onOpenSettings,
 }: ToolbarProps) {
   return (
@@ -33,6 +35,9 @@ export function Toolbar({
         </button>
       </div>
       <SearchBar onSelect={onRegionSelect} />
+      <button type="button" className="toolbar-history-button" onClick={onToggleHistory}>
+        History
+      </button>
       <button type="button" className="toolbar-settings-button" onClick={onOpenSettings}>
         Agent API
       </button>

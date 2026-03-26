@@ -93,7 +93,7 @@ describe("LayerPanel overlays", () => {
     const coverageCheckbox = await screen.findByLabelText(/GSV Coverage/i);
     fireEvent.click(coverageCheckbox);
 
-    const slider = await screen.findByRole("slider");
+    const slider = await screen.findByLabelText(/Coverage opacity/i);
     fireEvent.change(slider, { target: { value: "52" } });
 
     expect(onCoverageOpacityChange).toHaveBeenCalledWith(0.52);
@@ -128,6 +128,11 @@ describe("LayerPanel overlays", () => {
 
     expect(await screen.findByLabelText(/GSV Coverage/i)).toBeInTheDocument();
     expect(screen.queryByLabelText(/^Coverage$/i)).toBeNull();
-    expect(await screen.findByText(/^Note$/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        (content, element) =>
+          content === "Note" && element?.classList.contains("layer-item-title") === true
+      )
+    ).toBeInTheDocument();
   });
 });

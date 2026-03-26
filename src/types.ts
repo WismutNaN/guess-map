@@ -50,3 +50,31 @@ export interface AssetInfo {
   height?: number | null;
   caption?: string | null;
 }
+
+export interface BatchMutationResult {
+  affected: number;
+}
+
+export interface EmptyRegionFilterInfo {
+  country_codes: string[];
+  admin1_codes: string[];
+}
+
+export interface RevisionLogEntry {
+  id: string;
+  entity_type: string;
+  entity_id: string;
+  action: string;
+  diff_json?: string | null;
+  created_by: string;
+  created_at: string;
+  comment?: string | null;
+}
+
+export interface RevisionLogFilterInput {
+  entityType?: string;
+  createdBy?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  limit?: number;
+}

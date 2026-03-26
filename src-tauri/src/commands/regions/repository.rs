@@ -140,6 +140,46 @@ pub(crate) fn get_region_by_id(
     .map_err(|e| e.to_string())
 }
 
+pub(crate) fn list_regions_by_country(
+    conn: &rusqlite::Connection,
+    country_code: &str,
+    region_level: Option<&str>,
+) -> Result<Vec<RegionInfo>, String> {
+    let country_code = match non_empty_trimmed(country_code) {
+        Some(value) => value.to_uppercase(),
+        None => return Ok(Vec::new()),
+    };
+
+    let query = if region_level.and_then(non_empty_trimmed).is_some() {
+        "SELECT id, name, name_en, country_code, region_level, geometry_ref, anchor_lng, anchor_lat
+         FROM region
+         WHERE is_active = 1
+           AND country_code = ?1
+           AND region_level = ?2
+         ORDER BY name"
+    } else {
+        "SELECT id, name, name_en, country_code, region_level, geometry_ref, anchor_lng, anchor_lat
+         FROM region
+         WHERE is_active = 1
+           AND country_code = ?1
+         ORDER BY
+           CASE region_level WHEN 'country' THEN 0 WHEN 'admin1' THEN 1 ELSE 2 END,
+           name"
+    };
+
+    let mut stmt = conn.prepare(query).map_err(|e| e.to_string())?;
+    let regions = if let Some(level) = region_level.and_then(non_empty_trimmed) {
+        stmt.query_map(rusqlite::params![country_code, level], row_to_region_info)
+    } else {
+        stmt.query_map([country_code], row_to_region_info)
+    }
+    .map_err(|e| e.to_string())?
+    .filter_map(|row| row.ok())
+    .collect::<Vec<_>>();
+
+    Ok(regions)
+}
+
 fn non_empty_trimmed(value: &str) -> Option<&str> {
     let trimmed = value.trim();
     if trimmed.is_empty() {

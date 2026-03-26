@@ -1,18 +1,20 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import maplibregl from "maplibre-gl";
+import { ChangeLog } from "./components/ChangeLog";
 import { LayerPanel } from "./components/LayerPanel";
 import { MapView } from "./components/MapView";
 import { RegionInspector } from "./components/RegionInspector";
 import { Settings } from "./components/Settings";
 import { StatusBar } from "./components/StatusBar";
 import { Toolbar } from "./components/Toolbar";
-import { refreshHintTypeOnMap } from "./map/hintLayers";
+import { applyMinConfidenceFilter, refreshHintTypeOnMap } from "./map/hintLayers";
 import { setLayerGroupVisibility } from "./map/layerManager";
 import { DEFAULT_COVERAGE_OPACITY, setCoverageOpacity } from "./map/layers/coverage";
 import { setRoutesCountryFilter } from "./map/layers/routes";
-import type { AppMode, RegionInfo } from "./types";
+import { setEmptyRegionFilter } from "./map/layers/regions";
+import type { AppMode, EmptyRegionFilterInfo, RegionInfo } from "./types";
 import "./App.css";
 
 interface RegionStats {
@@ -31,10 +33,16 @@ function App() {
   const [stats, setStats] = useState<RegionStats | null>(null);
   const [zoom, setZoom] = useState(2);
   const [mode, setMode] = useState<AppMode>("editor");
-  const [selectedRegion, setSelectedRegion] = useState<RegionInfo | null>(null);
+  const [selectedRegions, setSelectedRegions] = useState<RegionInfo[]>([]);
+  const [activeRegionId, setActiveRegionId] = useState<string | null>(null);
   const [layerPanelVersion, setLayerPanelVersion] = useState(0);
+  const [revisionSignal, setRevisionSignal] = useState(0);
   const [coverageOpacity, setCoverageOpacityState] = useState(DEFAULT_COVERAGE_OPACITY);
+  const [minConfidence, setMinConfidence] = useState(0);
+  const [emptyFilterHintType, setEmptyFilterHintType] = useState("");
+  const [showEmptyRegions, setShowEmptyRegions] = useState(false);
   const [routesFilterMode, setRoutesFilterMode] = useState<RoutesFilterMode>("all");
+  const [changeLogOpen, setChangeLogOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const mapRef = useRef<maplibregl.Map | null>(null);
 
@@ -42,11 +50,6 @@ function App() {
     invoke<RegionStats>("get_region_stats")
       .then(setStats)
       .catch(console.error);
-  }, []);
-
-  const handleMapReady = useCallback((map: maplibregl.Map) => {
-    mapRef.current = map;
-    setLayerPanelVersion((version) => version + 1);
   }, []);
 
   const handleLayerToggle = useCallback((code: string, visible: boolean) => {
@@ -62,7 +65,50 @@ function App() {
     }
   }, []);
 
+  const selectedRegion = useMemo(() => {
+    if (selectedRegions.length === 0) {
+      return null;
+    }
+    if (activeRegionId) {
+      const active = selectedRegions.find((region) => region.id === activeRegionId);
+      if (active) {
+        return active;
+      }
+    }
+    return selectedRegions[0];
+  }, [activeRegionId, selectedRegions]);
+
+  const handleSelectionChange = useCallback((regions: RegionInfo[], activeRegion: RegionInfo | null) => {
+    setSelectedRegions(regions);
+    if (regions.length === 0) {
+      setActiveRegionId(null);
+      return;
+    }
+
+    if (activeRegion) {
+      setActiveRegionId(activeRegion.id);
+      return;
+    }
+
+    setActiveRegionId((current) => {
+      if (current && regions.some((region) => region.id === current)) {
+        return current;
+      }
+      return regions[0].id;
+    });
+  }, []);
+
   const selectedCountryCode = selectedRegion?.country_code ?? null;
+
+  const handleMapReady = useCallback((map: maplibregl.Map) => {
+    mapRef.current = map;
+    applyMinConfidenceFilter(map, minConfidence);
+    setCoverageOpacity(map, coverageOpacity);
+    const filterCountry =
+      routesFilterMode === "selected_country" ? selectedCountryCode : null;
+    setRoutesCountryFilter(map, filterCountry);
+    setLayerPanelVersion((version) => version + 1);
+  }, [coverageOpacity, minConfidence, routesFilterMode, selectedCountryCode]);
 
   useEffect(() => {
     if (!mapRef.current) {
@@ -72,6 +118,43 @@ function App() {
       routesFilterMode === "selected_country" ? selectedCountryCode : null;
     setRoutesCountryFilter(mapRef.current, filterCountry);
   }, [routesFilterMode, selectedCountryCode]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) {
+      return;
+    }
+    applyMinConfidenceFilter(map, minConfidence);
+  }, [minConfidence]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const map = mapRef.current;
+    if (!map) {
+      return;
+    }
+
+    if (!showEmptyRegions || !emptyFilterHintType) {
+      setEmptyRegionFilter(map, null);
+      return;
+    }
+
+    void invoke<EmptyRegionFilterInfo>("get_empty_region_filter", {
+      hintTypeCode: emptyFilterHintType,
+    })
+      .then((filterInfo) => {
+        if (!cancelled && mapRef.current) {
+          setEmptyRegionFilter(mapRef.current, filterInfo);
+        }
+      })
+      .catch((error) => {
+        console.error("Failed to load empty region filter:", error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [emptyFilterHintType, showEmptyRegions, layerPanelVersion]);
 
   const flyToRegion = useCallback((region: RegionInfo) => {
     const map = mapRef.current;
@@ -90,7 +173,8 @@ function App() {
 
   const handleSearchRegionSelect = useCallback(
     (region: RegionInfo) => {
-      setSelectedRegion(region);
+      setSelectedRegions([region]);
+      setActiveRegionId(region.id);
       flyToRegion(region);
       if (mode === "study") {
         setMode("editor");
@@ -107,6 +191,7 @@ function App() {
       );
     }
     setLayerPanelVersion((version) => version + 1);
+    setRevisionSignal((version) => version + 1);
   }, []);
 
   useEffect(() => {
@@ -127,6 +212,7 @@ function App() {
       }
 
       setLayerPanelVersion((version) => version + 1);
+      setRevisionSignal((version) => version + 1);
     }).then((dispose) => {
       unlisten = dispose;
     });
@@ -142,14 +228,15 @@ function App() {
         mode={mode}
         onModeChange={setMode}
         onRegionSelect={handleSearchRegionSelect}
+        onToggleHistory={() => setChangeLogOpen((open) => !open)}
         onOpenSettings={() => setSettingsOpen(true)}
       />
 
       <div className="map-wrapper">
         <MapView
           editorMode={mode === "editor"}
-          selectedRegion={selectedRegion}
-          onRegionSelect={setSelectedRegion}
+          selectedRegions={selectedRegions}
+          onSelectionChange={handleSelectionChange}
           onZoomChange={setZoom}
           onMapReady={handleMapReady}
         />
@@ -160,6 +247,12 @@ function App() {
         refreshSignal={layerPanelVersion}
         coverageOpacity={coverageOpacity}
         onCoverageOpacityChange={handleCoverageOpacityChange}
+        minConfidence={minConfidence}
+        onMinConfidenceChange={setMinConfidence}
+        emptyFilterHintType={emptyFilterHintType}
+        onEmptyFilterHintTypeChange={setEmptyFilterHintType}
+        showEmptyRegions={showEmptyRegions}
+        onShowEmptyRegionsChange={setShowEmptyRegions}
         selectedCountryCode={selectedCountryCode}
         routesFilterMode={routesFilterMode}
         onRoutesFilterModeChange={setRoutesFilterMode}
@@ -168,14 +261,21 @@ function App() {
       {mode === "editor" && (
         <RegionInspector
           region={selectedRegion}
-          onDeselect={() => setSelectedRegion(null)}
+          selectedRegions={selectedRegions}
+          onSelectionChange={handleSelectionChange}
           onHintChanged={handleHintChanged}
         />
       )}
 
+      <ChangeLog
+        open={changeLogOpen}
+        onClose={() => setChangeLogOpen(false)}
+        refreshSignal={revisionSignal}
+      />
+
       <Settings open={settingsOpen} onClose={() => setSettingsOpen(false)} />
 
-      <StatusBar stats={stats} zoom={zoom} />
+      <StatusBar stats={stats} zoom={zoom} selectedCount={selectedRegions.length} />
     </div>
   );
 }

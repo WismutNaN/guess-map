@@ -48,6 +48,16 @@ pub fn get_region_by_id(
     repository::get_region_by_id(&conn, &region_id)
 }
 
+#[tauri::command]
+pub fn list_regions_by_country(
+    db: State<'_, DbState>,
+    country_code: String,
+    region_level: Option<String>,
+) -> Result<Vec<RegionInfo>, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    repository::list_regions_by_country(&conn, &country_code, region_level.as_deref())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -100,5 +110,14 @@ mod tests {
         let region = result.expect("region not found");
         assert_eq!(region.name, "Karnataka");
         assert_eq!(region.region_level, "admin1");
+    }
+
+    #[test]
+    fn test_list_regions_by_country_with_level_filter() {
+        let conn = setup_conn();
+        let regions = repository::list_regions_by_country(&conn, "IN", Some("admin1")).unwrap();
+        assert_eq!(regions.len(), 1);
+        assert_eq!(regions[0].name, "Karnataka");
+        assert_eq!(regions[0].region_level, "admin1");
     }
 }

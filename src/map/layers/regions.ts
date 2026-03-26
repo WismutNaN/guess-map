@@ -1,5 +1,23 @@
 import maplibregl from "maplibre-gl";
 import { patchCountryISOCodes } from "../geoPatch";
+import type { EmptyRegionFilterInfo } from "../../types";
+
+const COUNTRY_FILL_LAYER_ID = "region-country-fill";
+const COUNTRY_BORDER_LAYER_ID = "region-country-border";
+const ADMIN1_HIT_LAYER_ID = "region-admin1-hit";
+const ADMIN1_BORDER_LAYER_ID = "region-admin1-border";
+
+const EMPTY_COUNTRY_FILTER: maplibregl.FilterSpecification = [
+  "==",
+  ["get", "ISO_A2"],
+  "__none__",
+];
+
+const EMPTY_ADMIN1_FILTER: maplibregl.FilterSpecification = [
+  "==",
+  ["get", "iso_3166_2"],
+  "__none__",
+];
 
 /**
  * Load region GeoJSON sources and add country/admin1 border layers.
@@ -19,7 +37,7 @@ async function addCountryLayers(map: maplibregl.Map) {
   map.addSource("regions-countries", { type: "geojson", data });
 
   map.addLayer({
-    id: "region-country-fill",
+    id: COUNTRY_FILL_LAYER_ID,
     type: "fill",
     source: "regions-countries",
     paint: {
@@ -34,7 +52,7 @@ async function addCountryLayers(map: maplibregl.Map) {
   });
 
   map.addLayer({
-    id: "region-country-border",
+    id: COUNTRY_BORDER_LAYER_ID,
     type: "line",
     source: "regions-countries",
     layout: { "line-join": "round", "line-cap": "round" },
@@ -58,7 +76,7 @@ async function addAdmin1Layers(map: maplibregl.Map) {
   map.addSource("regions-admin1", { type: "geojson", data });
 
   map.addLayer({
-    id: "region-admin1-hit",
+    id: ADMIN1_HIT_LAYER_ID,
     type: "fill",
     source: "regions-admin1",
     minzoom: 4,
@@ -69,7 +87,7 @@ async function addAdmin1Layers(map: maplibregl.Map) {
   });
 
   map.addLayer({
-    id: "region-admin1-border",
+    id: ADMIN1_BORDER_LAYER_ID,
     type: "line",
     source: "regions-admin1",
     minzoom: 4,
@@ -124,4 +142,39 @@ function addCountryInteractions(map: maplibregl.Map) {
     map.getCanvas().style.cursor = "";
   });
 
+}
+
+export function setEmptyRegionFilter(
+  map: maplibregl.Map,
+  filterInfo: EmptyRegionFilterInfo | null
+) {
+  if (!map.getLayer(COUNTRY_FILL_LAYER_ID) || !map.getLayer(ADMIN1_HIT_LAYER_ID)) {
+    return;
+  }
+
+  if (!filterInfo) {
+    map.setFilter(COUNTRY_FILL_LAYER_ID, null);
+    map.setFilter(COUNTRY_BORDER_LAYER_ID, null);
+    map.setFilter(ADMIN1_HIT_LAYER_ID, null);
+    map.setFilter(ADMIN1_BORDER_LAYER_ID, null);
+    return;
+  }
+
+  const countryFilter: maplibregl.FilterSpecification =
+    filterInfo.country_codes.length > 0
+      ? ["in", ["get", "ISO_A2"], ["literal", filterInfo.country_codes]]
+      : EMPTY_COUNTRY_FILTER;
+  const admin1Filter: maplibregl.FilterSpecification =
+    filterInfo.admin1_codes.length > 0
+      ? ([
+          "any",
+          ["in", ["get", "iso_3166_2"], ["literal", filterInfo.admin1_codes]],
+          ["in", ["get", "adm1_code"], ["literal", filterInfo.admin1_codes]],
+        ] as maplibregl.FilterSpecification)
+      : EMPTY_ADMIN1_FILTER;
+
+  map.setFilter(COUNTRY_FILL_LAYER_ID, countryFilter);
+  map.setFilter(COUNTRY_BORDER_LAYER_ID, countryFilter);
+  map.setFilter(ADMIN1_HIT_LAYER_ID, admin1Filter);
+  map.setFilter(ADMIN1_BORDER_LAYER_ID, admin1Filter);
 }

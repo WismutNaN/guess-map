@@ -8,6 +8,10 @@ const LABEL_LAYER_ID = "routes-label";
 const CASING_LAYER_ID = "routes-casing";
 const HINT_TYPE_CODE = "highway";
 const ROUTE_LAYER_IDS = [CASING_LAYER_ID, LINE_LAYER_ID, LABEL_LAYER_ID] as const;
+const routeFilterState = new WeakMap<
+  maplibregl.Map,
+  { countryCode: string | null; minConfidence: number }
+>();
 
 async function loadRoutesGeoJson() {
   const geojsonStr = await invoke<string>("compile_line_layer", {
@@ -101,6 +105,7 @@ export async function addRouteLayers(map: maplibregl.Map) {
   });
 
   registerLayerGroup("routes", [...ROUTE_LAYER_IDS], false);
+  routeFilterState.set(map, { countryCode: null, minConfidence: 0 });
 }
 
 export async function refreshRouteLayers(map: maplibregl.Map) {
@@ -113,17 +118,53 @@ export async function refreshRouteLayers(map: maplibregl.Map) {
 }
 
 export function setRoutesCountryFilter(map: maplibregl.Map, countryCode?: string | null) {
-  const filter = countryCode
-    ? ([
-        "any",
-        ["==", ["get", "country_code"], countryCode],
-        ["in", countryCode, ["get", "countries"]],
-      ] as maplibregl.FilterSpecification)
-    : null;
+  const next = routeFilterState.get(map) ?? { countryCode: null, minConfidence: 0 };
+  next.countryCode = countryCode ?? null;
+  routeFilterState.set(map, next);
+  applyRouteFilters(map, next.countryCode, next.minConfidence);
+}
+
+export function setRoutesMinConfidence(map: maplibregl.Map, minConfidence: number) {
+  const next = routeFilterState.get(map) ?? { countryCode: null, minConfidence: 0 };
+  next.minConfidence = Math.max(0, Math.min(1, minConfidence));
+  routeFilterState.set(map, next);
+  applyRouteFilters(map, next.countryCode, next.minConfidence);
+}
+
+function applyRouteFilters(
+  map: maplibregl.Map,
+  countryCode: string | null,
+  minConfidence: number
+) {
+  const clauses: maplibregl.FilterSpecification[] = [];
+
+  if (countryCode) {
+    clauses.push([
+      "any",
+      ["==", ["get", "country_code"], countryCode],
+      ["in", countryCode, ["get", "countries"]],
+    ] as maplibregl.FilterSpecification);
+  }
+
+  if (minConfidence > 0) {
+    clauses.push([
+      ">=",
+      ["coalesce", ["get", "confidence"], 0],
+      minConfidence,
+    ] as maplibregl.FilterSpecification);
+  }
+
+  const filter =
+    clauses.length === 0
+      ? null
+      : clauses.length === 1
+      ? clauses[0]
+      : (["all", ...clauses] as maplibregl.FilterSpecification);
 
   for (const layerId of ROUTE_LAYER_IDS) {
-    if (map.getLayer(layerId)) {
-      map.setFilter(layerId, filter);
+    if (!map.getLayer(layerId)) {
+      continue;
     }
+    map.setFilter(layerId, filter);
   }
 }

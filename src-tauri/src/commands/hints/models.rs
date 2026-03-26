@@ -54,6 +54,33 @@ pub struct CreateHintInput {
 
 #[derive(Debug, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
+pub struct BatchCreateHintsInput {
+    pub region_ids: Vec<String>,
+    pub hint_type_code: String,
+    pub short_value: Option<String>,
+    pub full_value: Option<String>,
+    pub data_json: Option<Value>,
+    pub color: Option<String>,
+    pub confidence: Option<f64>,
+    pub min_zoom: Option<f64>,
+    pub max_zoom: Option<f64>,
+    pub is_visible: Option<bool>,
+    pub image_asset_id: Option<String>,
+    pub icon_asset_id: Option<String>,
+    pub source_note: Option<String>,
+    pub created_by: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchDeleteHintsInput {
+    pub region_ids: Vec<String>,
+    pub hint_type_code: String,
+    pub created_by: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct UpdateHintInput {
     pub id: String,
     pub region_id: String,
@@ -70,6 +97,17 @@ pub struct UpdateHintInput {
     pub icon_asset_id: Option<String>,
     pub source_note: Option<String>,
     pub created_by: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct BatchMutationResult {
+    pub affected: usize,
+}
+
+#[derive(Debug, Serialize)]
+pub struct EmptyRegionFilterInfo {
+    pub country_codes: Vec<String>,
+    pub admin1_codes: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
