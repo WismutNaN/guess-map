@@ -135,7 +135,6 @@ pub fn run() {
             commands::hints::delete_hint,
             commands::hints::compile_hint_layer,
             commands::hints::compile_polygon_enrichment,
-            commands::tile_proxy::fetch_gsv_tile,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

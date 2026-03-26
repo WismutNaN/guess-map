@@ -1,18 +1,10 @@
 import { useEffect, useRef } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import {
-  addCityLayers,
-  addCoverageLayer,
-  addDrivingSideLayer,
-  addFlagLayer,
-  addNoteLayer,
-  addRegionLayers,
-  addRouteLayers,
-  addSelectionLayers,
-  setSelectedRegion,
-} from "../map/layers";
+import { createBaseMapStyle } from "../map/baseStyle";
+import { bootstrapMapLayers } from "../map/bootstrapLayers";
 import { bindRegionSelection } from "../map/interaction";
+import { addSelectionLayers, setSelectedRegion } from "../map/layers";
 import { loadMapPosition, saveMapPosition } from "../map/persistence";
 import type { RegionInfo } from "../types";
 
@@ -71,31 +63,13 @@ export function MapView({
 
       const map = new maplibregl.Map({
         container: containerRef.current!,
-        style: {
-          version: 8,
-          sources: {
-            "osm-tiles": {
-              type: "raster",
-              tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
-              tileSize: 256,
-              attribution:
-                '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-            },
-          },
-          layers: [
-            {
-              id: "osm-tiles",
-              type: "raster",
-              source: "osm-tiles",
-              minzoom: 0,
-              maxzoom: 19,
-            },
-          ],
-        },
+        style: createBaseMapStyle(),
         center: [saved.lng, saved.lat],
         zoom: saved.zoom,
         maxZoom: 18,
         minZoom: 1,
+        // We add a single compact attribution control manually below.
+        attributionControl: false,
       });
 
       map.addControl(new maplibregl.NavigationControl(), "top-right");
@@ -105,23 +79,7 @@ export function MapView({
       );
 
       map.on("load", async () => {
-        await addRegionLayers(map);
-        await addDrivingSideLayer(map).catch((error) =>
-          console.error("Failed to load driving_side layer:", error)
-        );
-        await addCityLayers(map);
-        await addFlagLayer(map).catch((error) =>
-          console.error("Failed to load flag layer:", error)
-        );
-        await addNoteLayer(map).catch((error) =>
-          console.error("Failed to load note layer:", error)
-        );
-        await addCoverageLayer(map).catch((error) =>
-          console.error("Failed to load coverage layer:", error)
-        );
-        await addRouteLayers(map).catch((error) =>
-          console.error("Failed to load route layers:", error)
-        );
+        await bootstrapMapLayers(map);
 
         addSelectionLayers(map);
         setSelectedRegion(map, selectedRegionRef.current);

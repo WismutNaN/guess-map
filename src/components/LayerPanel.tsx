@@ -1,22 +1,36 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { DEFAULT_COVERAGE_OPACITY } from "../map/layers/coverage";
+import { OVERLAY_LAYERS } from "../map/overlays";
 import type { HintTypeInfo } from "../types";
+import { HintSection } from "./layers/HintSection";
+import { OverlaySection } from "./layers/OverlaySection";
+import { emitVisibilityState, mergeLayerVisibility } from "./layers/visibility";
 
 interface LayerPanelProps {
   onToggle: (code: string, visible: boolean) => void;
   refreshSignal?: number;
+  coverageOpacity?: number;
+  onCoverageOpacityChange?: (opacity: number) => void;
 }
 
-const OVERLAY_LAYERS = [
-  { code: "gsv_coverage", title: "GSV Coverage", icon: "📍" },
-  { code: "routes", title: "Routes / Highways", icon: "🛣️" },
-] as const;
-
-export function LayerPanel({ onToggle, refreshSignal = 0 }: LayerPanelProps) {
+export function LayerPanel({
+  onToggle,
+  refreshSignal = 0,
+  coverageOpacity = DEFAULT_COVERAGE_OPACITY,
+  onCoverageOpacityChange,
+}: LayerPanelProps) {
   const [hintTypes, setHintTypes] = useState<HintTypeInfo[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [visibility, setVisibility] = useState<Record<string, boolean>>({});
   const [collapsed, setCollapsed] = useState(false);
+  const [coverageOpacityLocal, setCoverageOpacityLocal] = useState(
+    Math.round(coverageOpacity * 100)
+  );
+
+  useEffect(() => {
+    setCoverageOpacityLocal(Math.round(coverageOpacity * 100));
+  }, [coverageOpacity]);
 
   useEffect(() => {
     let cancelled = false;
@@ -30,19 +44,8 @@ export function LayerPanel({ onToggle, refreshSignal = 0 }: LayerPanelProps) {
       setHintTypes(activeTypes);
       setCounts(c);
       setVisibility((prev) => {
-        const next: Record<string, boolean> = { ...prev };
-        for (const ol of OVERLAY_LAYERS) {
-          next[ol.code] = prev[ol.code] ?? false;
-        }
-        for (const t of activeTypes) {
-          next[t.code] = prev[t.code] ?? (c[t.code] ?? 0) > 0;
-        }
-        for (const t of activeTypes) {
-          onToggle(t.code, next[t.code]);
-        }
-        for (const ol of OVERLAY_LAYERS) {
-          onToggle(ol.code, next[ol.code]);
-        }
+        const next = mergeLayerVisibility(prev, OVERLAY_LAYERS, activeTypes, c);
+        emitVisibilityState(onToggle, OVERLAY_LAYERS, activeTypes, next);
         return next;
       });
     });
@@ -58,6 +61,11 @@ export function LayerPanel({ onToggle, refreshSignal = 0 }: LayerPanelProps) {
     onToggle(code, next);
   };
 
+  const handleCoverageOpacityChange = (value: number) => {
+    setCoverageOpacityLocal(value);
+    onCoverageOpacityChange?.(value / 100);
+  };
+
   if (hintTypes.length === 0) return null;
 
   return (
@@ -71,41 +79,18 @@ export function LayerPanel({ onToggle, refreshSignal = 0 }: LayerPanelProps) {
       </div>
       {!collapsed && (
         <div className="layer-panel-body">
-          <div className="layer-section-label">Overlays</div>
-          {OVERLAY_LAYERS.map((ol) => (
-            <label key={ol.code} className="layer-item">
-              <input
-                type="checkbox"
-                checked={visibility[ol.code] ?? false}
-                onChange={() => handleToggle(ol.code)}
-              />
-              <span className="layer-item-title">
-                {ol.icon} {ol.title}
-              </span>
-            </label>
-          ))}
-          <div className="layer-section-label">Hints</div>
-          {hintTypes.map((ht) => {
-            const count = counts[ht.code] ?? 0;
-            const hasData = count > 0;
-            return (
-              <label
-                key={ht.code}
-                className={`layer-item${!hasData ? " layer-item-empty" : ""}`}
-              >
-                <input
-                  type="checkbox"
-                  checked={visibility[ht.code] ?? false}
-                  disabled={!hasData && !(visibility[ht.code] ?? false)}
-                  onChange={() => handleToggle(ht.code)}
-                />
-                <span className="layer-item-title">{ht.title}</span>
-                <span className="layer-item-count">
-                  {hasData ? count : "--"}
-                </span>
-              </label>
-            );
-          })}
+          <OverlaySection
+            visibility={visibility}
+            coverageOpacityPercent={coverageOpacityLocal}
+            onToggle={handleToggle}
+            onCoverageOpacityChange={handleCoverageOpacityChange}
+          />
+          <HintSection
+            hintTypes={hintTypes}
+            counts={counts}
+            visibility={visibility}
+            onToggle={handleToggle}
+          />
         </div>
       )}
     </div>

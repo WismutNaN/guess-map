@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { LayerPanel } from "./LayerPanel";
+import { DEFAULT_COVERAGE_OPACITY } from "../map/layers/coverage";
 
 const invokeMock = vi.fn();
 
@@ -57,5 +58,26 @@ describe("LayerPanel overlays", () => {
 
     expect(onToggle).toHaveBeenLastCalledWith("routes", false);
     expect(onToggle).toHaveBeenCalledWith("gsv_coverage", true);
+  });
+
+  it("emits coverage opacity changes when slider moves", async () => {
+    const onToggle = vi.fn();
+    const onCoverageOpacityChange = vi.fn();
+
+    render(
+      <LayerPanel
+        onToggle={onToggle}
+        onCoverageOpacityChange={onCoverageOpacityChange}
+        coverageOpacity={DEFAULT_COVERAGE_OPACITY}
+      />
+    );
+
+    const coverageCheckbox = await screen.findByLabelText(/GSV Coverage/i);
+    fireEvent.click(coverageCheckbox);
+
+    const slider = await screen.findByRole("slider");
+    fireEvent.change(slider, { target: { value: "52" } });
+
+    expect(onCoverageOpacityChange).toHaveBeenCalledWith(0.52);
   });
 });

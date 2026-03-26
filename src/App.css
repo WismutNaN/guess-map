@@ -213,6 +213,25 @@ body {
   color: #6b7ab0;
 }
 
+.overlay-slider-block {
+  padding: 4px 12px 8px;
+}
+
+.overlay-slider-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #aeb8df;
+  margin-bottom: 4px;
+}
+
+.overlay-slider {
+  width: 100%;
+  accent-color: #7fa2ff;
+  cursor: pointer;
+}
+
 .region-inspector {
   position: absolute;
   top: 58px;

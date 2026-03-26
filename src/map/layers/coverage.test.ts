@@ -1,4 +1,8 @@
-import { addCoverageLayer, setCoverageOpacity } from "./coverage";
+import {
+  addCoverageLayer,
+  DEFAULT_COVERAGE_OPACITY,
+  setCoverageOpacity,
+} from "./coverage";
 
 const invokeMock = vi.fn();
 const registerLayerGroupMock = vi.fn();
@@ -57,7 +61,11 @@ describe("coverage layer", () => {
       expect.objectContaining({
         id: "gsv-coverage",
         type: "raster",
-        paint: expect.objectContaining({ "raster-opacity": 0.7 }),
+        paint: expect.objectContaining({
+          "raster-opacity": DEFAULT_COVERAGE_OPACITY,
+          "raster-contrast": 0.28,
+          "raster-saturation": 0.12,
+        }),
       })
     );
 
@@ -111,5 +119,28 @@ describe("coverage layer", () => {
     expect(
       (missingLayerMap.setPaintProperty as unknown as ReturnType<typeof vi.fn>)
     ).not.toHaveBeenCalled();
+  });
+
+  it("clamps opacity to valid range", () => {
+    const map = createMapMock({
+      getLayer: vi.fn(() => ({ id: "gsv-coverage" })),
+    });
+
+    setCoverageOpacity(map, 2);
+    setCoverageOpacity(map, -1);
+
+    const setPaintProperty = map.setPaintProperty as unknown as ReturnType<typeof vi.fn>;
+    expect(setPaintProperty).toHaveBeenNthCalledWith(
+      1,
+      "gsv-coverage",
+      "raster-opacity",
+      1
+    );
+    expect(setPaintProperty).toHaveBeenNthCalledWith(
+      2,
+      "gsv-coverage",
+      "raster-opacity",
+      0
+    );
   });
 });

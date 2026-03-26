@@ -8,6 +8,7 @@ import { StatusBar } from "./components/StatusBar";
 import { Toolbar } from "./components/Toolbar";
 import { refreshHintTypeOnMap } from "./map/hintLayers";
 import { setLayerGroupVisibility } from "./map/layerManager";
+import { DEFAULT_COVERAGE_OPACITY, setCoverageOpacity } from "./map/layers/coverage";
 import type { AppMode, RegionInfo } from "./types";
 import "./App.css";
 
@@ -23,6 +24,7 @@ function App() {
   const [mode, setMode] = useState<AppMode>("editor");
   const [selectedRegion, setSelectedRegion] = useState<RegionInfo | null>(null);
   const [layerPanelVersion, setLayerPanelVersion] = useState(0);
+  const [coverageOpacity, setCoverageOpacityState] = useState(DEFAULT_COVERAGE_OPACITY);
   const mapRef = useRef<maplibregl.Map | null>(null);
 
   useEffect(() => {
@@ -39,6 +41,13 @@ function App() {
   const handleLayerToggle = useCallback((code: string, visible: boolean) => {
     if (mapRef.current) {
       setLayerGroupVisibility(mapRef.current, code, visible);
+    }
+  }, []);
+
+  const handleCoverageOpacityChange = useCallback((opacity: number) => {
+    setCoverageOpacityState(opacity);
+    if (mapRef.current) {
+      setCoverageOpacity(mapRef.current, opacity);
     }
   }, []);
 
@@ -96,7 +105,12 @@ function App() {
         />
       </div>
 
-      <LayerPanel onToggle={handleLayerToggle} refreshSignal={layerPanelVersion} />
+      <LayerPanel
+        onToggle={handleLayerToggle}
+        refreshSignal={layerPanelVersion}
+        coverageOpacity={coverageOpacity}
+        onCoverageOpacityChange={handleCoverageOpacityChange}
+      />
 
       {mode === "editor" && (
         <RegionInspector

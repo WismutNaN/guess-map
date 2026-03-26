@@ -5,6 +5,15 @@ const SOURCE_ID = "routes";
 const LINE_LAYER_ID = "routes-line";
 const LABEL_LAYER_ID = "routes-label";
 const CASING_LAYER_ID = "routes-casing";
+const ROUTES_DATA_URL = "/geodata/routes.geojson";
+
+async function loadRoutesGeoJson() {
+  const response = await fetch(ROUTES_DATA_URL);
+  if (!response.ok) {
+    throw new Error(`Failed to load routes GeoJSON (${response.status})`);
+  }
+  return (await response.json()) as GeoJSON.FeatureCollection<GeoJSON.Geometry>;
+}
 
 /**
  * Load route GeoJSON and render as styled line layers.
@@ -14,8 +23,7 @@ const CASING_LAYER_ID = "routes-casing";
 export async function addRouteLayers(map: maplibregl.Map) {
   if (map.getSource(SOURCE_ID)) return;
 
-  const resp = await fetch("/geodata/routes.geojson");
-  const data = await resp.json();
+  const data = await loadRoutesGeoJson();
 
   map.addSource(SOURCE_ID, { type: "geojson", data });
 
