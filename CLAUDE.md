@@ -78,6 +78,14 @@ node scripts/gm-agent.mjs by-country '{"country_code":"DE","region_level":"admin
 node scripts/gm-agent.mjs fill-country-domains
 node scripts/gm-agent.mjs fill-country-domains --country GB --force
 
+# Fill phone hints (country + admin1 where regional data exists)
+node scripts/gm-agent.mjs fill-phone-codes
+node scripts/gm-agent.mjs fill-phone-codes --country US --force
+
+# Note: regional admin1 phone overrides are currently provided for US/CA.
+# Regional admin1 phone overrides are currently provided for US/CA/BR/AU.
+# Other countries get country-level phone_hint.
+
 # Batch create hints (JSON file or string)
 node scripts/gm-agent.mjs batch-hints hints.json
 

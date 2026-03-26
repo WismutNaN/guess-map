@@ -1,0 +1,1256 @@
+{
+  "source": "react-country-state-city:countriesminified.json",
+  "generated_at": "2026-03-26T22:00:33.454Z",
+  "items": [
+    {
+      "country_code": "AD",
+      "prefix": "+376",
+      "format": null
+    },
+    {
+      "country_code": "AE",
+      "prefix": "+971",
+      "format": null
+    },
+    {
+      "country_code": "AF",
+      "prefix": "+93",
+      "format": null
+    },
+    {
+      "country_code": "AG",
+      "prefix": "+1",
+      "format": null
+    },
+    {
+      "country_code": "AI",
+      "prefix": "+1",
+      "format": null
+    },
+    {
+      "country_code": "AL",
+      "prefix": "+355",
+      "format": null
+    },
+    {
+      "country_code": "AM",
+      "prefix": "+374",
+      "format": null
+    },
+    {
+      "country_code": "AO",
+      "prefix": "+244",
+      "format": null
+    },
+    {
+      "country_code": "AQ",
+      "prefix": "+672",
+      "format": null
+    },
+    {
+      "country_code": "AR",
+      "prefix": "+54",
+      "format": null
+    },
+    {
+      "country_code": "AS",
+      "prefix": "+1",
+      "format": null
+    },
+    {
+      "country_code": "AT",
+      "prefix": "+43",
+      "format": null
+    },
+    {
+      "country_code": "AU",
+      "prefix": "+61",
+      "format": null
+    },
+    {
+      "country_code": "AW",
+      "prefix": "+297",
+      "format": null
+    },
+    {
+      "country_code": "AX",
+      "prefix": "+358",
+      "format": null
+    },
+    {
+      "country_code": "AZ",
+      "prefix": "+994",
+      "format": null
+    },
+    {
+      "country_code": "BA",
+      "prefix": "+387",
+      "format": null
+    },
+    {
+      "country_code": "BB",
+      "prefix": "+1",
+      "format": null
+    },
+    {
+      "country_code": "BD",
+      "prefix": "+880",
+      "format": null
+    },
+    {
+      "country_code": "BE",
+      "prefix": "+32",
+      "format": null
+    },
+    {
+      "country_code": "BF",
+      "prefix": "+226",
+      "format": null
+    },
+    {
+      "country_code": "BG",
+      "prefix": "+359",
+      "format": null
+    },
+    {
+      "country_code": "BH",
+      "prefix": "+973",
+      "format": null
+    },
+    {
+      "country_code": "BI",
+      "prefix": "+257",
+      "format": null
+    },
+    {
+      "country_code": "BJ",
+      "prefix": "+229",
+      "format": null
+    },
+    {
+      "country_code": "BL",
+      "prefix": "+590",
+      "format": null
+    },
+    {
+      "country_code": "BM",
+      "prefix": "+1",
+      "format": null
+    },
+    {
+      "country_code": "BN",
+      "prefix": "+673",
+      "format": null
+    },
+    {
+      "country_code": "BO",
+      "prefix": "+591",
+      "format": null
+    },
+    {
+      "country_code": "BQ",
+      "prefix": "+599",
+      "format": null
+    },
+    {
+      "country_code": "BR",
+      "prefix": "+55",
+      "format": null
+    },
+    {
+      "country_code": "BS",
+      "prefix": "+1",
+      "format": null
+    },
+    {
+      "country_code": "BT",
+      "prefix": "+975",
+      "format": null
+    },
+    {
+      "country_code": "BV",
+      "prefix": "+55",
+      "format": null
+    },
+    {
+      "country_code": "BW",
+      "prefix": "+267",
+      "format": null
+    },
+    {
+      "country_code": "BY",
+      "prefix": "+375",
+      "format": null
+    },
+    {
+      "country_code": "BZ",
+      "prefix": "+501",
+      "format": null
+    },
+    {
+      "country_code": "CA",
+      "prefix": "+1",
+      "format": "(NPA) NXX-XXXX"
+    },
+    {
+      "country_code": "CC",
+      "prefix": "+61",
+      "format": null
+    },
+    {
+      "country_code": "CD",
+      "prefix": "+243",
+      "format": null
+    },
+    {
+      "country_code": "CF",
+      "prefix": "+236",
+      "format": null
+    },
+    {
+      "country_code": "CG",
+      "prefix": "+242",
+      "format": null
+    },
+    {
+      "country_code": "CH",
+      "prefix": "+41",
+      "format": null
+    },
+    {
+      "country_code": "CI",
+      "prefix": "+225",
+      "format": null
+    },
+    {
+      "country_code": "CK",
+      "prefix": "+682",
+      "format": null
+    },
+    {
+      "country_code": "CL",
+      "prefix": "+56",
+      "format": null
+    },
+    {
+      "country_code": "CM",
+      "prefix": "+237",
+      "format": null
+    },
+    {
+      "country_code": "CN",
+      "prefix": "+86",
+      "format": null
+    },
+    {
+      "country_code": "CO",
+      "prefix": "+57",
+      "format": null
+    },
+    {
+      "country_code": "CR",
+      "prefix": "+506",
+      "format": null
+    },
+    {
+      "country_code": "CU",
+      "prefix": "+53",
+      "format": null
+    },
+    {
+      "country_code": "CV",
+      "prefix": "+238",
+      "format": null
+    },
+    {
+      "country_code": "CW",
+      "prefix": "+599",
+      "format": null
+    },
+    {
+      "country_code": "CX",
+      "prefix": "+61",
+      "format": null
+    },
+    {
+      "country_code": "CY",
+      "prefix": "+357",
+      "format": null
+    },
+    {
+      "country_code": "CZ",
+      "prefix": "+420",
+      "format": null
+    },
+    {
+      "country_code": "DE",
+      "prefix": "+49",
+      "format": null
+    },
+    {
+      "country_code": "DJ",
+      "prefix": "+253",
+      "format": null
+    },
+    {
+      "country_code": "DK",
+      "prefix": "+45",
+      "format": null
+    },
+    {
+      "country_code": "DM",
+      "prefix": "+1",
+      "format": null
+    },
+    {
+      "country_code": "DO",
+      "prefix": "+1",
+      "format": null
+    },
+    {
+      "country_code": "DZ",
+      "prefix": "+213",
+      "format": null
+    },
+    {
+      "country_code": "EC",
+      "prefix": "+593",
+      "format": null
+    },
+    {
+      "country_code": "EE",
+      "prefix": "+372",
+      "format": null
+    },
+    {
+      "country_code": "EG",
+      "prefix": "+20",
+      "format": null
+    },
+    {
+      "country_code": "EH",
+      "prefix": "+212",
+      "format": null
+    },
+    {
+      "country_code": "ER",
+      "prefix": "+291",
+      "format": null
+    },
+    {
+      "country_code": "ES",
+      "prefix": "+34",
+      "format": null
+    },
+    {
+      "country_code": "ET",
+      "prefix": "+251",
+      "format": null
+    },
+    {
+      "country_code": "FI",
+      "prefix": "+358",
+      "format": null
+    },
+    {
+      "country_code": "FJ",
+      "prefix": "+679",
+      "format": null
+    },
+    {
+      "country_code": "FK",
+      "prefix": "+500",
+      "format": null
+    },
+    {
+      "country_code": "FM",
+      "prefix": "+691",
+      "format": null
+    },
+    {
+      "country_code": "FO",
+      "prefix": "+298",
+      "format": null
+    },
+    {
+      "country_code": "FR",
+      "prefix": "+33",
+      "format": null
+    },
+    {
+      "country_code": "GA",
+      "prefix": "+241",
+      "format": null
+    },
+    {
+      "country_code": "GB",
+      "prefix": "+44",
+      "format": null
+    },
+    {
+      "country_code": "GD",
+      "prefix": "+1",
+      "format": null
+    },
+    {
+      "country_code": "GE",
+      "prefix": "+995",
+      "format": null
+    },
+    {
+      "country_code": "GF",
+      "prefix": "+594",
+      "format": null
+    },
+    {
+      "country_code": "GG",
+      "prefix": "+44",
+      "format": null
+    },
+    {
+      "country_code": "GH",
+      "prefix": "+233",
+      "format": null
+    },
+    {
+      "country_code": "GI",
+      "prefix": "+350",
+      "format": null
+    },
+    {
+      "country_code": "GL",
+      "prefix": "+299",
+      "format": null
+    },
+    {
+      "country_code": "GM",
+      "prefix": "+220",
+      "format": null
+    },
+    {
+      "country_code": "GN",
+      "prefix": "+224",
+      "format": null
+    },
+    {
+      "country_code": "GP",
+      "prefix": "+590",
+      "format": null
+    },
+    {
+      "country_code": "GQ",
+      "prefix": "+240",
+      "format": null
+    },
+    {
+      "country_code": "GR",
+      "prefix": "+30",
+      "format": null
+    },
+    {
+      "country_code": "GS",
+      "prefix": "+500",
+      "format": null
+    },
+    {
+      "country_code": "GT",
+      "prefix": "+502",
+      "format": null
+    },
+    {
+      "country_code": "GU",
+      "prefix": "+1",
+      "format": null
+    },
+    {
+      "country_code": "GW",
+      "prefix": "+245",
+      "format": null
+    },
+    {
+      "country_code": "GY",
+      "prefix": "+592",
+      "format": null
+    },
+    {
+      "country_code": "HK",
+      "prefix": "+852",
+      "format": null
+    },
+    {
+      "country_code": "HM",
+      "prefix": "+672",
+      "format": null
+    },
+    {
+      "country_code": "HN",
+      "prefix": "+504",
+      "format": null
+    },
+    {
+      "country_code": "HR",
+      "prefix": "+385",
+      "format": null
+    },
+    {
+      "country_code": "HT",
+      "prefix": "+509",
+      "format": null
+    },
+    {
+      "country_code": "HU",
+      "prefix": "+36",
+      "format": null
+    },
+    {
+      "country_code": "ID",
+      "prefix": "+62",
+      "format": null
+    },
+    {
+      "country_code": "IE",
+      "prefix": "+353",
+      "format": null
+    },
+    {
+      "country_code": "IL",
+      "prefix": "+972",
+      "format": null
+    },
+    {
+      "country_code": "IM",
+      "prefix": "+44",
+      "format": null
+    },
+    {
+      "country_code": "IN",
+      "prefix": "+91",
+      "format": null
+    },
+    {
+      "country_code": "IO",
+      "prefix": "+246",
+      "format": null
+    },
+    {
+      "country_code": "IQ",
+      "prefix": "+964",
+      "format": null
+    },
+    {
+      "country_code": "IR",
+      "prefix": "+98",
+      "format": null
+    },
+    {
+      "country_code": "IS",
+      "prefix": "+354",
+      "format": null
+    },
+    {
+      "country_code": "IT",
+      "prefix": "+39",
+      "format": null
+    },
+    {
+      "country_code": "JE",
+      "prefix": "+44",
+      "format": null
+    },
+    {
+      "country_code": "JM",
+      "prefix": "+1",
+      "format": null
+    },
+    {
+      "country_code": "JO",
+      "prefix": "+962",
+      "format": null
+    },
+    {
+      "country_code": "JP",
+      "prefix": "+81",
+      "format": null
+    },
+    {
+      "country_code": "KE",
+      "prefix": "+254",
+      "format": null
+    },
+    {
+      "country_code": "KG",
+      "prefix": "+996",
+      "format": null
+    },
+    {
+      "country_code": "KH",
+      "prefix": "+855",
+      "format": null
+    },
+    {
+      "country_code": "KI",
+      "prefix": "+686",
+      "format": null
+    },
+    {
+      "country_code": "KM",
+      "prefix": "+269",
+      "format": null
+    },
+    {
+      "country_code": "KN",
+      "prefix": "+1",
+      "format": null
+    },
+    {
+      "country_code": "KP",
+      "prefix": "+850",
+      "format": null
+    },
+    {
+      "country_code": "KR",
+      "prefix": "+82",
+      "format": null
+    },
+    {
+      "country_code": "KW",
+      "prefix": "+965",
+      "format": null
+    },
+    {
+      "country_code": "KY",
+      "prefix": "+1",
+      "format": null
+    },
+    {
+      "country_code": "KZ",
+      "prefix": "+7",
+      "format": null
+    },
+    {
+      "country_code": "LA",
+      "prefix": "+856",
+      "format": null
+    },
+    {
+      "country_code": "LB",
+      "prefix": "+961",
+      "format": null
+    },
+    {
+      "country_code": "LC",
+      "prefix": "+1",
+      "format": null
+    },
+    {
+      "country_code": "LI",
+      "prefix": "+423",
+      "format": null
+    },
+    {
+      "country_code": "LK",
+      "prefix": "+94",
+      "format": null
+    },
+    {
+      "country_code": "LR",
+      "prefix": "+231",
+      "format": null
+    },
+    {
+      "country_code": "LS",
+      "prefix": "+266",
+      "format": null
+    },
+    {
+      "country_code": "LT",
+      "prefix": "+370",
+      "format": null
+    },
+    {
+      "country_code": "LU",
+      "prefix": "+352",
+      "format": null
+    },
+    {
+      "country_code": "LV",
+      "prefix": "+371",
+      "format": null
+    },
+    {
+      "country_code": "LY",
+      "prefix": "+218",
+      "format": null
+    },
+    {
+      "country_code": "MA",
+      "prefix": "+212",
+      "format": null
+    },
+    {
+      "country_code": "MC",
+      "prefix": "+377",
+      "format": null
+    },
+    {
+      "country_code": "MD",
+      "prefix": "+373",
+      "format": null
+    },
+    {
+      "country_code": "ME",
+      "prefix": "+382",
+      "format": null
+    },
+    {
+      "country_code": "MF",
+      "prefix": "+590",
+      "format": null
+    },
+    {
+      "country_code": "MG",
+      "prefix": "+261",
+      "format": null
+    },
+    {
+      "country_code": "MH",
+      "prefix": "+692",
+      "format": null
+    },
+    {
+      "country_code": "MK",
+      "prefix": "+389",
+      "format": null
+    },
+    {
+      "country_code": "ML",
+      "prefix": "+223",
+      "format": null
+    },
+    {
+      "country_code": "MM",
+      "prefix": "+95",
+      "format": null
+    },
+    {
+      "country_code": "MN",
+      "prefix": "+976",
+      "format": null
+    },
+    {
+      "country_code": "MO",
+      "prefix": "+853",
+      "format": null
+    },
+    {
+      "country_code": "MP",
+      "prefix": "+1",
+      "format": null
+    },
+    {
+      "country_code": "MQ",
+      "prefix": "+596",
+      "format": null
+    },
+    {
+      "country_code": "MR",
+      "prefix": "+222",
+      "format": null
+    },
+    {
+      "country_code": "MS",
+      "prefix": "+1",
+      "format": null
+    },
+    {
+      "country_code": "MT",
+      "prefix": "+356",
+      "format": null
+    },
+    {
+      "country_code": "MU",
+      "prefix": "+230",
+      "format": null
+    },
+    {
+      "country_code": "MV",
+      "prefix": "+960",
+      "format": null
+    },
+    {
+      "country_code": "MW",
+      "prefix": "+265",
+      "format": null
+    },
+    {
+      "country_code": "MX",
+      "prefix": "+52",
+      "format": null
+    },
+    {
+      "country_code": "MY",
+      "prefix": "+60",
+      "format": null
+    },
+    {
+      "country_code": "MZ",
+      "prefix": "+258",
+      "format": null
+    },
+    {
+      "country_code": "NA",
+      "prefix": "+264",
+      "format": null
+    },
+    {
+      "country_code": "NC",
+      "prefix": "+687",
+      "format": null
+    },
+    {
+      "country_code": "NE",
+      "prefix": "+227",
+      "format": null
+    },
+    {
+      "country_code": "NF",
+      "prefix": "+672",
+      "format": null
+    },
+    {
+      "country_code": "NG",
+      "prefix": "+234",
+      "format": null
+    },
+    {
+      "country_code": "NI",
+      "prefix": "+505",
+      "format": null
+    },
+    {
+      "country_code": "NL",
+      "prefix": "+31",
+      "format": null
+    },
+    {
+      "country_code": "NO",
+      "prefix": "+47",
+      "format": null
+    },
+    {
+      "country_code": "NP",
+      "prefix": "+977",
+      "format": null
+    },
+    {
+      "country_code": "NR",
+      "prefix": "+674",
+      "format": null
+    },
+    {
+      "country_code": "NU",
+      "prefix": "+683",
+      "format": null
+    },
+    {
+      "country_code": "NZ",
+      "prefix": "+64",
+      "format": null
+    },
+    {
+      "country_code": "OM",
+      "prefix": "+968",
+      "format": null
+    },
+    {
+      "country_code": "PA",
+      "prefix": "+507",
+      "format": null
+    },
+    {
+      "country_code": "PE",
+      "prefix": "+51",
+      "format": null
+    },
+    {
+      "country_code": "PF",
+      "prefix": "+689",
+      "format": null
+    },
+    {
+      "country_code": "PG",
+      "prefix": "+675",
+      "format": null
+    },
+    {
+      "country_code": "PH",
+      "prefix": "+63",
+      "format": null
+    },
+    {
+      "country_code": "PK",
+      "prefix": "+92",
+      "format": null
+    },
+    {
+      "country_code": "PL",
+      "prefix": "+48",
+      "format": null
+    },
+    {
+      "country_code": "PM",
+      "prefix": "+508",
+      "format": null
+    },
+    {
+      "country_code": "PN",
+      "prefix": "+870",
+      "format": null
+    },
+    {
+      "country_code": "PR",
+      "prefix": "+1",
+      "format": null
+    },
+    {
+      "country_code": "PS",
+      "prefix": "+970",
+      "format": null
+    },
+    {
+      "country_code": "PT",
+      "prefix": "+351",
+      "format": null
+    },
+    {
+      "country_code": "PW",
+      "prefix": "+680",
+      "format": null
+    },
+    {
+      "country_code": "PY",
+      "prefix": "+595",
+      "format": null
+    },
+    {
+      "country_code": "QA",
+      "prefix": "+974",
+      "format": null
+    },
+    {
+      "country_code": "RE",
+      "prefix": "+262",
+      "format": null
+    },
+    {
+      "country_code": "RO",
+      "prefix": "+40",
+      "format": null
+    },
+    {
+      "country_code": "RS",
+      "prefix": "+381",
+      "format": null
+    },
+    {
+      "country_code": "RU",
+      "prefix": "+7",
+      "format": null
+    },
+    {
+      "country_code": "RW",
+      "prefix": "+250",
+      "format": null
+    },
+    {
+      "country_code": "SA",
+      "prefix": "+966",
+      "format": null
+    },
+    {
+      "country_code": "SB",
+      "prefix": "+677",
+      "format": null
+    },
+    {
+      "country_code": "SC",
+      "prefix": "+248",
+      "format": null
+    },
+    {
+      "country_code": "SD",
+      "prefix": "+249",
+      "format": null
+    },
+    {
+      "country_code": "SE",
+      "prefix": "+46",
+      "format": null
+    },
+    {
+      "country_code": "SG",
+      "prefix": "+65",
+      "format": null
+    },
+    {
+      "country_code": "SH",
+      "prefix": "+290",
+      "format": null
+    },
+    {
+      "country_code": "SI",
+      "prefix": "+386",
+      "format": null
+    },
+    {
+      "country_code": "SJ",
+      "prefix": "+47",
+      "format": null
+    },
+    {
+      "country_code": "SK",
+      "prefix": "+421",
+      "format": null
+    },
+    {
+      "country_code": "SL",
+      "prefix": "+232",
+      "format": null
+    },
+    {
+      "country_code": "SM",
+      "prefix": "+378",
+      "format": null
+    },
+    {
+      "country_code": "SN",
+      "prefix": "+221",
+      "format": null
+    },
+    {
+      "country_code": "SO",
+      "prefix": "+252",
+      "format": null
+    },
+    {
+      "country_code": "SR",
+      "prefix": "+597",
+      "format": null
+    },
+    {
+      "country_code": "SS",
+      "prefix": "+211",
+      "format": null
+    },
+    {
+      "country_code": "ST",
+      "prefix": "+239",
+      "format": null
+    },
+    {
+      "country_code": "SV",
+      "prefix": "+503",
+      "format": null
+    },
+    {
+      "country_code": "SX",
+      "prefix": "+1721",
+      "format": null
+    },
+    {
+      "country_code": "SY",
+      "prefix": "+963",
+      "format": null
+    },
+    {
+      "country_code": "SZ",
+      "prefix": "+268",
+      "format": null
+    },
+    {
+      "country_code": "TC",
+      "prefix": "+1",
+      "format": null
+    },
+    {
+      "country_code": "TD",
+      "prefix": "+235",
+      "format": null
+    },
+    {
+      "country_code": "TF",
+      "prefix": "+262",
+      "format": null
+    },
+    {
+      "country_code": "TG",
+      "prefix": "+228",
+      "format": null
+    },
+    {
+      "country_code": "TH",
+      "prefix": "+66",
+      "format": null
+    },
+    {
+      "country_code": "TJ",
+      "prefix": "+992",
+      "format": null
+    },
+    {
+      "country_code": "TK",
+      "prefix": "+690",
+      "format": null
+    },
+    {
+      "country_code": "TL",
+      "prefix": "+670",
+      "format": null
+    },
+    {
+      "country_code": "TM",
+      "prefix": "+993",
+      "format": null
+    },
+    {
+      "country_code": "TN",
+      "prefix": "+216",
+      "format": null
+    },
+    {
+      "country_code": "TO",
+      "prefix": "+676",
+      "format": null
+    },
+    {
+      "country_code": "TR",
+      "prefix": "+90",
+      "format": null
+    },
+    {
+      "country_code": "TT",
+      "prefix": "+1",
+      "format": null
+    },
+    {
+      "country_code": "TV",
+      "prefix": "+688",
+      "format": null
+    },
+    {
+      "country_code": "TW",
+      "prefix": "+886",
+      "format": null
+    },
+    {
+      "country_code": "TZ",
+      "prefix": "+255",
+      "format": null
+    },
+    {
+      "country_code": "UA",
+      "prefix": "+380",
+      "format": null
+    },
+    {
+      "country_code": "UG",
+      "prefix": "+256",
+      "format": null
+    },
+    {
+      "country_code": "UM",
+      "prefix": "+1",
+      "format": null
+    },
+    {
+      "country_code": "US",
+      "prefix": "+1",
+      "format": "(NPA) NXX-XXXX"
+    },
+    {
+      "country_code": "UY",
+      "prefix": "+598",
+      "format": null
+    },
+    {
+      "country_code": "UZ",
+      "prefix": "+998",
+      "format": null
+    },
+    {
+      "country_code": "VA",
+      "prefix": "+379",
+      "format": null
+    },
+    {
+      "country_code": "VC",
+      "prefix": "+1",
+      "format": null
+    },
+    {
+      "country_code": "VE",
+      "prefix": "+58",
+      "format": null
+    },
+    {
+      "country_code": "VG",
+      "prefix": "+1",
+      "format": null
+    },
+    {
+      "country_code": "VI",
+      "prefix": "+1",
+      "format": null
+    },
+    {
+      "country_code": "VN",
+      "prefix": "+84",
+      "format": null
+    },
+    {
+      "country_code": "VU",
+      "prefix": "+678",
+      "format": null
+    },
+    {
+      "country_code": "WF",
+      "prefix": "+681",
+      "format": null
+    },
+    {
+      "country_code": "WS",
+      "prefix": "+685",
+      "format": null
+    },
+    {
+      "country_code": "XK",
+      "prefix": "+383",
+      "format": null
+    },
+    {
+      "country_code": "YE",
+      "prefix": "+967",
+      "format": null
+    },
+    {
+      "country_code": "YT",
+      "prefix": "+262",
+      "format": null
+    },
+    {
+      "country_code": "ZA",
+      "prefix": "+27",
+      "format": null
+    },
+    {
+      "country_code": "ZM",
+      "prefix": "+260",
+      "format": null
+    },
+    {
+      "country_code": "ZW",
+      "prefix": "+263",
+      "format": null
+    }
+  ]
+}
