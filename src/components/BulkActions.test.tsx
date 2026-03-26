@@ -61,11 +61,18 @@ describe("BulkActions", () => {
       />
     );
 
-    await screen.findByLabelText("Type");
-    fireEvent.change(screen.getByLabelText("Short value"), {
+    // Wait for hint types to load — Note should appear in the select
+    await waitFor(() => {
+      expect(screen.getByText("2 regions selected")).toBeInTheDocument();
+    });
+
+    // The value input for the note type
+    const valueInput = screen.getByPlaceholderText("Value");
+    fireEvent.change(valueInput, {
       target: { value: "Left side roads" },
     });
-    fireEvent.click(screen.getByRole("button", { name: /Apply to 2 regions/i }));
+
+    fireEvent.click(screen.getByRole("button", { name: /Apply to 2/i }));
 
     await waitFor(() => {
       expect(invokeMock).toHaveBeenCalledWith("batch_create_hints", {

@@ -339,12 +339,13 @@ body {
 
 .region-actions {
   display: flex;
+  align-items: center;
   gap: 8px;
   padding: 10px 12px;
   border-bottom: 1px solid #313a59;
+  flex-wrap: wrap;
 }
 
-.region-actions button,
 .hint-actions button,
 .hint-form button {
   background: #283453;
@@ -356,7 +357,6 @@ body {
   cursor: pointer;
 }
 
-.region-actions button:hover,
 .hint-actions button:hover,
 .hint-form button:hover {
   background: #314165;
@@ -371,40 +371,188 @@ body {
   gap: 8px;
 }
 
-.bulk-actions {
-  border-top: 1px solid #313a59;
-  padding: 10px 12px;
-  background: #1f2741;
+/* ---- Bulk Actions Bar (bottom, standalone) ---- */
+
+.bulk-bar {
+  position: absolute;
+  bottom: 28px; /* above status bar */
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 15;
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  align-items: center;
+  gap: 16px;
+  background: rgba(24, 29, 48, 0.97);
+  border: 1px solid #3a4b75;
+  border-radius: 12px;
+  padding: 10px 18px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
+  max-width: calc(100vw - 48px);
 }
 
-.bulk-list {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  max-height: 88px;
-  overflow-y: auto;
-  border: 1px solid #364573;
-  border-radius: 7px;
-  background: #1b2135;
-  padding: 6px;
+.bulk-bar-info {
+  min-width: 120px;
+  max-width: 220px;
 }
 
-.bulk-item {
+.bulk-bar-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #e4e8ff;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bulk-bar-clear {
+  background: none;
+  border: none;
+  color: #8994c0;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 0 2px;
+  line-height: 1;
+}
+
+.bulk-bar-clear:hover {
+  color: #ff9f9f;
+}
+
+.bulk-bar-summary {
+  font-size: 11px;
+  color: #9ba4ca;
+  margin-top: 2px;
+}
+
+.bulk-bar-names {
+  font-size: 11px;
+  color: #7e8ab5;
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bulk-bar-form {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bulk-bar-select {
+  background: #151b2e;
+  color: #edf1ff;
+  border: 1px solid #324066;
+  border-radius: 6px;
+  padding: 5px 8px;
   font-size: 12px;
-  color: #b8c2ea;
+  max-width: 150px;
+}
+
+.bulk-bar-input {
+  background: #151b2e;
+  color: #edf1ff;
+  border: 1px solid #324066;
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 12px;
+  width: 100px;
+}
+
+.bulk-bar-input-narrow {
+  width: 55px;
+}
+
+.bulk-bar-submit {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.bulk-bar-result {
+  font-size: 11px;
+  color: #8fff8f;
+}
+
+.bulk-bar-error {
+  font-size: 11px;
+  color: #ff9f9f;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .bulk-mode-toggle {
   display: flex;
-  gap: 6px;
+  gap: 2px;
+}
+
+.bulk-mode-toggle button {
+  background: #21273c;
+  color: #cfd3e6;
+  border: 1px solid #333a55;
+  border-radius: 6px;
+  padding: 5px 10px;
+  cursor: pointer;
+  font-size: 12px;
 }
 
 .bulk-mode-toggle button.active {
   background: #3b4a79;
+  color: #ffffff;
   border-color: #4f63a8;
+}
+
+/* ---- Buttons ---- */
+
+.btn-primary {
+  background: #3b5998;
+  color: #ffffff;
+  border: 1px solid #4f6fb8;
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.btn-primary:hover {
+  background: #4a6bb8;
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: #283453;
+  color: #eef1ff;
+  border: 1px solid #3a4b75;
+  border-radius: 6px;
+  padding: 5px 9px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.btn-secondary:hover {
+  background: #314165;
+}
+
+.btn-secondary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ---- Selection Actions (inside inspector) ---- */
+
+.selection-actions {
+  display: flex;
+  gap: 6px;
 }
 
 .section-title {
@@ -837,5 +985,31 @@ body {
     bottom: auto;
     height: 42%;
     width: auto;
+  }
+
+  .bulk-bar {
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px 12px;
+    width: calc(100% - 48px);
+    left: 24px;
+    transform: none;
+  }
+
+  .bulk-bar-info {
+    max-width: none;
+    width: 100%;
+  }
+
+  .bulk-bar-form {
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
+  .bulk-bar-submit {
+    width: 100%;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
   }
 }

@@ -34,7 +34,9 @@
       "Bash(npm ls:*)",
       "Bash(xargs grep:*)",
       "Bash(node scripts/gm-agent.mjs)",
-      "Bash(GM_API_TOKEN=test node scripts/gm-agent.mjs help)"
+      "Bash(GM_API_TOKEN=test node scripts/gm-agent.mjs help)",
+      "Bash(npm run:*)",
+      "Bash(npm test:*)"
     ]
   }
 }
