@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { DEFAULT_COVERAGE_OPACITY } from "../map/layers/coverage";
+import { DEFAULT_FLAG_SIZE_SCALE } from "../map/layers/flags";
 import { isOverlayManagedHintType, OVERLAY_LAYERS } from "../map/overlays";
 import type { HintTypeInfo } from "../types";
 import { HintSection } from "./layers/HintSection";
@@ -12,6 +13,8 @@ interface LayerPanelProps {
   refreshSignal?: number;
   coverageOpacity?: number;
   onCoverageOpacityChange?: (opacity: number) => void;
+  flagSizeScale?: number;
+  onFlagSizeScaleChange?: (scale: number) => void;
   minConfidence?: number;
   onMinConfidenceChange?: (value: number) => void;
   emptyFilterHintType?: string;
@@ -28,6 +31,8 @@ export function LayerPanel({
   refreshSignal = 0,
   coverageOpacity = DEFAULT_COVERAGE_OPACITY,
   onCoverageOpacityChange,
+  flagSizeScale = DEFAULT_FLAG_SIZE_SCALE,
+  onFlagSizeScaleChange,
   minConfidence = 0,
   onMinConfidenceChange,
   emptyFilterHintType = "",
@@ -45,6 +50,7 @@ export function LayerPanel({
   const [coverageOpacityLocal, setCoverageOpacityLocal] = useState(
     Math.round(coverageOpacity * 100)
   );
+  const [flagSizeLocal, setFlagSizeLocal] = useState(Math.round(flagSizeScale * 100));
   const [minConfidenceLocal, setMinConfidenceLocal] = useState(
     Math.round(minConfidence * 100)
   );
@@ -55,6 +61,10 @@ export function LayerPanel({
   useEffect(() => {
     setCoverageOpacityLocal(Math.round(coverageOpacity * 100));
   }, [coverageOpacity]);
+
+  useEffect(() => {
+    setFlagSizeLocal(Math.round(flagSizeScale * 100));
+  }, [flagSizeScale]);
 
   useEffect(() => {
     setMinConfidenceLocal(Math.round(minConfidence * 100));
@@ -167,6 +177,27 @@ export function LayerPanel({
                 </option>
               ))}
             </select>
+          </div>
+
+          <div className="overlay-slider-block">
+            <div className="overlay-slider-label">
+              Flag size
+              <span>{flagSizeLocal}%</span>
+            </div>
+            <input
+              className="overlay-slider"
+              type="range"
+              aria-label="Flag size"
+              min={100}
+              max={300}
+              step={5}
+              value={flagSizeLocal}
+              onChange={(event) => {
+                const raw = Number.parseInt(event.target.value, 10);
+                setFlagSizeLocal(raw);
+                onFlagSizeScaleChange?.(raw / 100);
+              }}
+            />
           </div>
 
           <div className="overlay-slider-block">

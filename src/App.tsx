@@ -130,6 +130,8 @@ function App() {
         refreshSignal={layers.refreshSignal}
         coverageOpacity={layers.coverageOpacity}
         onCoverageOpacityChange={layers.setCoverageOpacity}
+        flagSizeScale={layers.flagSizeScale}
+        onFlagSizeScaleChange={layers.setFlagSizeScale}
         minConfidence={layers.minConfidence}
         onMinConfidenceChange={layers.setMinConfidence}
         emptyFilterHintType={layers.emptyFilterHintType}

@@ -18,9 +18,10 @@ const LAYER_BOOTSTRAP_STEPS: LayerBootstrapStep[] = [
   { label: "region layers", run: addRegionLayers },
   { label: "driving_side layer", run: addDrivingSideLayer },
   { label: "city layers", run: addCityLayers },
+  // Coverage must stay below hint symbols so flags/notes remain readable.
+  { label: "coverage layer", run: addCoverageLayer },
   { label: "flag layer", run: addFlagLayer },
   { label: "note layer", run: addNoteLayer },
-  { label: "coverage layer", run: addCoverageLayer },
   { label: "route layers", run: addRouteLayers },
 ];
 

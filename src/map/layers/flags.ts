@@ -6,6 +6,14 @@ const SOURCE_ID = "hint-flags";
 const LAYER_ID = "hint-flags";
 const IMAGE_ID_PREFIX = "flag-icon:";
 const IMAGE_ID_PROPERTY = "icon_image_id";
+export const DEFAULT_FLAG_SIZE_SCALE = 1.75;
+const MIN_FLAG_SIZE_SCALE = 0.5;
+const MAX_FLAG_SIZE_SCALE = 3.0;
+const FLAG_BASE_SIZES = {
+  zoom2: 0.07,
+  zoom4: 0.1,
+  zoom7: 0.14,
+} as const;
 
 type FlagProperties = GeoJSON.GeoJsonProperties & {
   icon_asset_id?: string;
@@ -23,6 +31,26 @@ function normalizeText(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function clampFlagSizeScale(value: number): number {
+  if (!Number.isFinite(value)) return DEFAULT_FLAG_SIZE_SCALE;
+  return Math.max(MIN_FLAG_SIZE_SCALE, Math.min(MAX_FLAG_SIZE_SCALE, value));
+}
+
+function buildIconSizeExpression(scale: number): maplibregl.ExpressionSpecification {
+  const clamped = clampFlagSizeScale(scale);
+  return [
+    "interpolate",
+    ["linear"],
+    ["zoom"],
+    2,
+    FLAG_BASE_SIZES.zoom2 * clamped,
+    4,
+    FLAG_BASE_SIZES.zoom4 * clamped,
+    7,
+    FLAG_BASE_SIZES.zoom7 * clamped,
+  ] as maplibregl.ExpressionSpecification;
 }
 
 function imageIdForAsset(assetId: string): string {
@@ -141,17 +169,7 @@ export async function addFlagLayer(map: maplibregl.Map) {
       maxzoom: 8,
       layout: {
         "icon-image": ["get", IMAGE_ID_PROPERTY],
-        "icon-size": [
-          "interpolate",
-          ["linear"],
-          ["zoom"],
-          2,
-          0.07,
-          4,
-          0.1,
-          7,
-          0.14,
-        ],
+        "icon-size": buildIconSizeExpression(DEFAULT_FLAG_SIZE_SCALE),
         "icon-allow-overlap": false,
         "icon-optional": true,
         "text-field": [
@@ -214,6 +232,14 @@ export function setFlagMinConfidence(map: maplibregl.Map, minConfidence: number)
     ["coalesce", ["get", "confidence"], 0],
     minConfidence,
   ]);
+}
+
+export function setFlagSizeScale(map: maplibregl.Map, scale: number) {
+  if (!map.getLayer(LAYER_ID)) {
+    return;
+  }
+
+  map.setLayoutProperty(LAYER_ID, "icon-size", buildIconSizeExpression(scale));
 }
 
 async function loadFlagGeoJson() {

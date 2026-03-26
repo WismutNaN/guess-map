@@ -4,6 +4,10 @@ import maplibregl from "maplibre-gl";
 import { applyMinConfidenceFilter, refreshHintTypeOnMap } from "../map/hintLayers";
 import { setLayerGroupVisibility } from "../map/layerManager";
 import { DEFAULT_COVERAGE_OPACITY, setCoverageOpacity } from "../map/layers/coverage";
+import {
+  DEFAULT_FLAG_SIZE_SCALE,
+  setFlagSizeScale,
+} from "../map/layers/flags";
 import { setRoutesCountryFilter } from "../map/layers/routes";
 import { setEmptyRegionFilter } from "../map/layers/regions";
 import type { EmptyRegionFilterInfo } from "../types";
@@ -12,6 +16,7 @@ export type RoutesFilterMode = "all" | "selected_country";
 
 export interface LayerState {
   coverageOpacity: number;
+  flagSizeScale: number;
   minConfidence: number;
   emptyFilterHintType: string;
   showEmptyRegions: boolean;
@@ -22,6 +27,7 @@ export interface LayerState {
   revisionSignal: number;
 
   setCoverageOpacity: (opacity: number) => void;
+  setFlagSizeScale: (scale: number) => void;
   setMinConfidence: (value: number) => void;
   setEmptyFilterHintType: (code: string) => void;
   setShowEmptyRegions: (enabled: boolean) => void;
@@ -39,6 +45,7 @@ export interface LayerState {
 export function useLayerState(): LayerState {
   const mapRef = useRef<maplibregl.Map | null>(null);
   const [coverageOpacity, setCoverageOpacityVal] = useState(DEFAULT_COVERAGE_OPACITY);
+  const [flagSizeScale, setFlagSizeScaleVal] = useState(DEFAULT_FLAG_SIZE_SCALE);
   const [minConfidence, setMinConfidenceVal] = useState(0);
   const [emptyFilterHintType, setEmptyFilterHintType] = useState("");
   const [showEmptyRegions, setShowEmptyRegions] = useState(false);
@@ -66,6 +73,11 @@ export function useLayerState(): LayerState {
     if (mapRef.current) setCoverageOpacity(mapRef.current, opacity);
   }, []);
 
+  const handleFlagSizeScale = useCallback((scale: number) => {
+    setFlagSizeScaleVal(scale);
+    if (mapRef.current) setFlagSizeScale(mapRef.current, scale);
+  }, []);
+
   const onHintChanged = useCallback(
     (hintTypeCode: string) => {
       const map = mapRef.current;
@@ -84,6 +96,7 @@ export function useLayerState(): LayerState {
       mapRef.current = map;
       applyMinConfidenceFilter(map, minConfidence);
       setCoverageOpacity(map, coverageOpacity);
+      setFlagSizeScale(map, flagSizeScale);
       setRefreshSignal((v) => v + 1);
     },
     // Intentionally capture initial values only — sync effects handle updates
@@ -102,6 +115,11 @@ export function useLayerState(): LayerState {
   useEffect(() => {
     if (mapRef.current) applyMinConfidenceFilter(mapRef.current, minConfidence);
   }, [minConfidence]);
+
+  // Sync flag icon size to map
+  useEffect(() => {
+    if (mapRef.current) setFlagSizeScale(mapRef.current, flagSizeScale);
+  }, [flagSizeScale]);
 
   // Sync empty region filter to map
   useEffect(() => {
@@ -129,6 +147,7 @@ export function useLayerState(): LayerState {
 
   return {
     coverageOpacity,
+    flagSizeScale,
     minConfidence,
     emptyFilterHintType,
     showEmptyRegions,
@@ -137,6 +156,7 @@ export function useLayerState(): LayerState {
     revisionSignal,
 
     setCoverageOpacity: handleCoverageOpacity,
+    setFlagSizeScale: handleFlagSizeScale,
     setMinConfidence: setMinConfidenceVal,
     setEmptyFilterHintType,
     setShowEmptyRegions,
