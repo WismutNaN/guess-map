@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { AssetEditorItem, AssetInfo } from "../types";
+import type { AssetEditorItem, AssetInfo, AssetUsageInfo } from "../types";
 
 type SortMode =
   | "usage_desc"
@@ -27,6 +27,38 @@ type RawAssetEditorItem = {
   hintTypeCodes?: unknown;
   country_codes?: unknown;
   countryCodes?: unknown;
+};
+
+type RawAssetUsageItem = {
+  hint_id?: unknown;
+  hintId?: unknown;
+  link_field?: unknown;
+  linkField?: unknown;
+  hint_type_code?: unknown;
+  hintTypeCode?: unknown;
+  hint_type_title?: unknown;
+  hintTypeTitle?: unknown;
+  region_id?: unknown;
+  regionId?: unknown;
+  region_name?: unknown;
+  regionName?: unknown;
+  region_level?: unknown;
+  regionLevel?: unknown;
+  country_code?: unknown;
+  countryCode?: unknown;
+  short_value?: unknown;
+  shortValue?: unknown;
+  full_value?: unknown;
+  fullValue?: unknown;
+  source_note?: unknown;
+  sourceNote?: unknown;
+  confidence?: unknown;
+  created_by?: unknown;
+  createdBy?: unknown;
+  created_at?: unknown;
+  createdAt?: unknown;
+  updated_at?: unknown;
+  updatedAt?: unknown;
 };
 
 type CropRect = {
@@ -59,6 +91,8 @@ export function AssetLibrary() {
   const [sortMode, setSortMode] = useState<SortMode>("usage_desc");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [previewById, setPreviewById] = useState<Record<string, string>>({});
+  const [usageRows, setUsageRows] = useState<AssetUsageInfo[]>([]);
+  const [usageLoading, setUsageLoading] = useState(false);
   const [imageNatural, setImageNatural] = useState<{ width: number; height: number } | null>(
     null
   );
@@ -152,6 +186,16 @@ export function AssetLibrary() {
   }, [selectedId, filteredAssets]);
 
   useEffect(() => {
+    if (!selectedAsset) {
+      setUsageRows([]);
+      setUsageLoading(false);
+      return;
+    }
+    void loadUsage(selectedAsset.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAsset?.id]);
+
+  useEffect(() => {
     if (!drag) return;
 
     const handleMove = (event: MouseEvent) => {
@@ -200,6 +244,19 @@ export function AssetLibrary() {
       setPreviewById((prev) => ({ ...prev, [assetId]: dataUrl }));
     } catch (err) {
       console.error(`Failed to load asset preview ${assetId}:`, err);
+    }
+  }
+
+  async function loadUsage(assetId: string) {
+    setUsageLoading(true);
+    try {
+      const rows = await invoke<RawAssetUsageItem[]>("list_asset_usage", { assetId });
+      setUsageRows(rows.map(normalizeAssetUsageItem).filter((item) => item.hint_id.length > 0));
+    } catch (err) {
+      console.error(`Failed to load asset usage ${assetId}:`, err);
+      setUsageRows([]);
+    } finally {
+      setUsageLoading(false);
     }
   }
 
@@ -304,6 +361,37 @@ export function AssetLibrary() {
     } catch (err) {
       console.error("Failed to crop asset:", err);
       setError("Failed to crop image");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function deleteSelectedAsset() {
+    if (!selectedAsset) return;
+    const confirmed = window.confirm(
+      `Delete "${displayName(selectedAsset)}"?\nThis will remove the file and unlink it from hints.`
+    );
+    if (!confirmed) return;
+
+    setBusy(true);
+    setError(null);
+    try {
+      await invoke("delete_asset", {
+        input: {
+          assetId: selectedAsset.id,
+          deletedBy: "user",
+        },
+      });
+      setPreviewById((prev) => {
+        const next = { ...prev };
+        delete next[selectedAsset.id];
+        return next;
+      });
+      setAssets((prev) => prev.filter((item) => item.id !== selectedAsset.id));
+      setSelectedId((prev) => (prev === selectedAsset.id ? null : prev));
+    } catch (err) {
+      console.error("Failed to delete asset:", err);
+      setError("Failed to delete asset");
     } finally {
       setBusy(false);
     }
@@ -460,6 +548,9 @@ export function AssetLibrary() {
                 >
                   Apply Crop
                 </button>
+                <button type="button" onClick={deleteSelectedAsset} disabled={busy}>
+                  Delete Asset
+                </button>
               </div>
             </div>
 
@@ -568,6 +659,45 @@ export function AssetLibrary() {
                 Full Image
               </button>
             </div>
+
+            <div className="asset-usage-block">
+              <div className="asset-usage-title">
+                Linked Hint Records ({usageRows.length})
+              </div>
+              {usageLoading && <div className="asset-usage-empty">Loading linked records…</div>}
+              {!usageLoading && usageRows.length === 0 && (
+                <div className="asset-usage-empty">No linked hint records for this asset.</div>
+              )}
+              {!usageLoading && usageRows.length > 0 && (
+                <div className="asset-usage-list">
+                  {usageRows.map((row) => {
+                    const value = row.short_value?.trim() || row.full_value?.trim() || "—";
+                    return (
+                      <div className="asset-usage-item" key={`${row.hint_id}:${row.link_field}`}>
+                        <div className="asset-usage-head">
+                          <span className="asset-usage-type">
+                            {row.hint_type_title} ({row.hint_type_code})
+                          </span>
+                          <span className="asset-usage-link">{row.link_field}</span>
+                        </div>
+                        <div className="asset-usage-sub">
+                          {row.region_name} [{row.region_level}]
+                          {row.country_code ? ` • ${row.country_code}` : ""}
+                        </div>
+                        <div className="asset-usage-sub">Value: {value}</div>
+                        {row.source_note?.trim() && (
+                          <div className="asset-usage-sub">Source: {row.source_note}</div>
+                        )}
+                        <div className="asset-usage-sub">
+                          Confidence: {Math.round(row.confidence * 100)}% • by {row.created_by}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
             {!cropSupported && (
               <div className="asset-editor-error">
                 SVG crop is not supported yet. Replace image with raster (PNG/JPEG/WebP) to crop.
@@ -610,6 +740,28 @@ function normalizeAssetEditorItem(raw: RawAssetEditorItem): AssetEditorItem {
   };
 }
 
+function normalizeAssetUsageItem(raw: RawAssetUsageItem): AssetUsageInfo {
+  return {
+    hint_id: normalizeString(raw.hint_id) ?? normalizeString(raw.hintId) ?? "",
+    link_field: normalizeString(raw.link_field) ?? normalizeString(raw.linkField) ?? "image",
+    hint_type_code:
+      normalizeString(raw.hint_type_code) ?? normalizeString(raw.hintTypeCode) ?? "",
+    hint_type_title:
+      normalizeString(raw.hint_type_title) ?? normalizeString(raw.hintTypeTitle) ?? "",
+    region_id: normalizeString(raw.region_id) ?? normalizeString(raw.regionId) ?? "",
+    region_name: normalizeString(raw.region_name) ?? normalizeString(raw.regionName) ?? "",
+    region_level: normalizeString(raw.region_level) ?? normalizeString(raw.regionLevel) ?? "",
+    country_code: normalizeString(raw.country_code) ?? normalizeString(raw.countryCode),
+    short_value: normalizeString(raw.short_value) ?? normalizeString(raw.shortValue),
+    full_value: normalizeString(raw.full_value) ?? normalizeString(raw.fullValue),
+    source_note: normalizeString(raw.source_note) ?? normalizeString(raw.sourceNote),
+    confidence: normalizeNumber(raw.confidence) ?? 0,
+    created_by: normalizeString(raw.created_by) ?? normalizeString(raw.createdBy) ?? "unknown",
+    created_at: normalizeString(raw.created_at) ?? normalizeString(raw.createdAt) ?? "",
+    updated_at: normalizeString(raw.updated_at) ?? normalizeString(raw.updatedAt) ?? "",
+  };
+}
+
 function normalizeString(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
@@ -623,6 +775,17 @@ function normalizeInt(value: unknown): number | null {
   if (typeof value === "string") {
     const parsed = Number(value);
     if (Number.isFinite(parsed)) return Math.round(parsed);
+  }
+  return null;
+}
+
+function normalizeNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
   }
   return null;
 }

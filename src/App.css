@@ -1313,6 +1313,70 @@ body {
   cursor: pointer;
 }
 
+.asset-usage-block {
+  border: 1px solid #334067;
+  border-radius: 8px;
+  background: #141c31;
+  padding: 8px;
+}
+
+.asset-usage-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #dbe5ff;
+  margin-bottom: 6px;
+}
+
+.asset-usage-empty {
+  font-size: 12px;
+  color: #95a4d7;
+}
+
+.asset-usage-list {
+  max-height: 190px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-right: 2px;
+}
+
+.asset-usage-item {
+  border: 1px solid #384774;
+  border-radius: 7px;
+  background: #1a2440;
+  padding: 6px 7px;
+}
+
+.asset-usage-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.asset-usage-type {
+  font-size: 12px;
+  font-weight: 600;
+  color: #edf2ff;
+}
+
+.asset-usage-link {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  border: 1px solid #5970b3;
+  color: #bfd0ff;
+}
+
+.asset-usage-sub {
+  margin-top: 2px;
+  font-size: 11px;
+  color: #a7b5e4;
+  word-break: break-word;
+}
+
 .asset-editor-error {
   color: #ffacac;
   font-size: 12px;

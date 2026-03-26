@@ -1,4 +1,6 @@
-use super::models::{AssetInfo, CropAssetInput, ReplaceAssetInput, UploadAssetInput};
+use super::models::{
+    AssetInfo, CropAssetInput, DeleteAssetInput, ReplaceAssetInput, UploadAssetInput,
+};
 use crate::services::revision;
 use image::GenericImageView;
 use rusqlite::Connection;
@@ -217,8 +219,8 @@ pub(crate) fn crop_asset(
     let source_bytes =
         std::fs::read(&source_path).map_err(|e| format!("Failed to read source image: {}", e))?;
 
-    let format =
-        image::guess_format(&source_bytes).map_err(|_| "Asset is not a supported raster image".to_string())?;
+    let format = image::guess_format(&source_bytes)
+        .map_err(|_| "Asset is not a supported raster image".to_string())?;
     let source = image::load_from_memory_with_format(&source_bytes, format)
         .map_err(|_| "Asset is not a supported raster image".to_string())?;
     let (source_width, source_height) = source.dimensions();
@@ -299,6 +301,49 @@ pub(crate) fn crop_asset(
         height: Some(crop_h as i32),
         caption,
     })
+}
+
+pub(crate) fn delete_asset(
+    conn: &mut Connection,
+    app_data_dir: &Path,
+    input: DeleteAssetInput,
+) -> Result<(), String> {
+    let existing = load_asset_row(conn, &input.asset_id)?;
+    let existing_file_path = existing.file_path.clone();
+    let existing_kind = existing.kind.clone();
+    let deleted_by =
+        normalize_optional_text(input.deleted_by).unwrap_or_else(|| "user".to_string());
+
+    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+    tx.execute("DELETE FROM asset WHERE id = ?1", [&input.asset_id])
+        .map_err(|e| e.to_string())?;
+    let delete_diff = json!({
+        "op": "delete",
+        "file_path": existing_file_path,
+        "kind": existing_kind,
+    });
+    revision::log(
+        &tx,
+        "asset",
+        &input.asset_id,
+        "delete",
+        Some(&delete_diff),
+        &deleted_by,
+        None,
+    )?;
+    tx.commit().map_err(|e| e.to_string())?;
+
+    // Remove physical file after DB delete. If it fails, DB state remains consistent.
+    let normalized = existing.file_path.replace('\\', "/");
+    if normalized.starts_with("assets/") && !normalized.contains("..") {
+        let full_path = app_data_dir.join(&normalized);
+        if full_path.exists() {
+            std::fs::remove_file(&full_path)
+                .map_err(|e| format!("Asset deleted from DB, but file removal failed: {}", e))?;
+        }
+    }
+
+    Ok(())
 }
 
 struct ExistingAssetRow {

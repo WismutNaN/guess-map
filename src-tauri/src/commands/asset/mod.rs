@@ -3,7 +3,10 @@ pub(crate) mod service;
 
 use crate::db::DbState;
 use base64::Engine;
-pub use models::{AssetEditorItem, AssetInfo, CropAssetInput, ReplaceAssetInput, UploadAssetInput};
+pub use models::{
+    AssetEditorItem, AssetInfo, AssetUsageInfo, CropAssetInput, DeleteAssetInput,
+    ReplaceAssetInput, UploadAssetInput,
+};
 use rusqlite::OptionalExtension;
 use tauri::{Manager, State};
 
@@ -128,6 +131,71 @@ pub fn list_assets_for_editor(db: State<'_, DbState>) -> Result<Vec<AssetEditorI
 }
 
 #[tauri::command]
+pub fn list_asset_usage(
+    db: State<'_, DbState>,
+    asset_id: String,
+) -> Result<Vec<AssetUsageInfo>, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let mut stmt = conn
+        .prepare(
+            "SELECT
+                rh.id,
+                CASE
+                    WHEN rh.image_asset_id = ?1 AND rh.icon_asset_id = ?1 THEN 'image+icon'
+                    WHEN rh.image_asset_id = ?1 THEN 'image'
+                    ELSE 'icon'
+                END AS link_field,
+                ht.code,
+                ht.title,
+                r.id,
+                r.name,
+                r.region_level,
+                r.country_code,
+                rh.short_value,
+                rh.full_value,
+                rh.source_note,
+                rh.confidence,
+                rh.created_by,
+                rh.created_at,
+                rh.updated_at
+             FROM region_hint rh
+             JOIN hint_type ht ON ht.id = rh.hint_type_id
+             JOIN region r ON r.id = rh.region_id
+             WHERE rh.image_asset_id = ?1 OR rh.icon_asset_id = ?1
+             ORDER BY ht.sort_order ASC, ht.title ASC, r.name ASC, rh.created_at DESC",
+        )
+        .map_err(|e| e.to_string())?;
+
+    let rows = stmt
+        .query_map([&asset_id], |row| {
+            Ok(AssetUsageInfo {
+                hint_id: row.get(0)?,
+                link_field: row.get(1)?,
+                hint_type_code: row.get(2)?,
+                hint_type_title: row.get(3)?,
+                region_id: row.get(4)?,
+                region_name: row.get(5)?,
+                region_level: row.get(6)?,
+                country_code: row.get(7)?,
+                short_value: row.get(8)?,
+                full_value: row.get(9)?,
+                source_note: row.get(10)?,
+                confidence: row.get(11)?,
+                created_by: row.get(12)?,
+                created_at: row.get(13)?,
+                updated_at: row.get(14)?,
+            })
+        })
+        .map_err(|e| e.to_string())?;
+
+    let mut out = Vec::new();
+    for row in rows {
+        out.push(row.map_err(|e| e.to_string())?);
+    }
+    Ok(out)
+}
+
+#[tauri::command]
 pub fn replace_asset_bytes(
     app: tauri::AppHandle,
     db: State<'_, DbState>,
@@ -147,6 +215,17 @@ pub fn crop_asset_image(
     let app_data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let mut conn = db.conn.lock().map_err(|e| e.to_string())?;
     service::crop_asset(&mut conn, &app_data_dir, input)
+}
+
+#[tauri::command]
+pub fn delete_asset(
+    app: tauri::AppHandle,
+    db: State<'_, DbState>,
+    input: DeleteAssetInput,
+) -> Result<(), String> {
+    let app_data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let mut conn = db.conn.lock().map_err(|e| e.to_string())?;
+    service::delete_asset(&mut conn, &app_data_dir, input)
 }
 
 fn infer_mime_from_file_path(file_path: &str) -> Option<String> {
@@ -206,6 +285,12 @@ mod tests {
         dir
     }
 
+    fn temp_app_data_dir() -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("guess-map-app-data-test-{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
     #[test]
     fn test_save_asset_creates_file_and_record() {
         let db = DbState::new_in_memory().unwrap();
@@ -256,5 +341,67 @@ mod tests {
         assert_eq!(rev_count, 1);
 
         let _ = std::fs::remove_dir_all(assets_dir);
+    }
+
+    #[test]
+    fn test_delete_asset_removes_record_and_file() {
+        let db = DbState::new_in_memory().unwrap();
+        let mut conn = db.conn.into_inner().unwrap();
+        let app_data_dir = temp_app_data_dir();
+        let assets_dir = app_data_dir.join("assets");
+        std::fs::create_dir_all(&assets_dir).unwrap();
+        let png = make_test_png();
+
+        let asset = service::save_asset(
+            &mut conn,
+            &assets_dir,
+            UploadAssetInput {
+                file_name: "sample.png".to_string(),
+                bytes: png,
+                kind: Some("sample".to_string()),
+                caption: Some("to delete".to_string()),
+                created_by: Some("user".to_string()),
+            },
+        )
+        .unwrap();
+
+        let file_name = asset
+            .file_path
+            .strip_prefix("assets/")
+            .expect("relative path must start with assets/");
+        let full_path = assets_dir.join(file_name);
+        assert!(full_path.exists(), "asset file should exist before delete");
+
+        service::delete_asset(
+            &mut conn,
+            &app_data_dir,
+            DeleteAssetInput {
+                asset_id: asset.id.clone(),
+                deleted_by: Some("user".to_string()),
+            },
+        )
+        .unwrap();
+
+        let exists: usize = conn
+            .query_row(
+                "SELECT COUNT(*) FROM asset WHERE id = ?1",
+                [&asset.id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(exists, 0, "asset row should be deleted");
+        assert!(!full_path.exists(), "asset file should be removed");
+
+        let delete_revisions: usize = conn
+            .query_row(
+                "SELECT COUNT(*) FROM revision_log
+                 WHERE entity_type='asset' AND entity_id = ?1 AND action='delete'",
+                [&asset.id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(delete_revisions, 1, "delete revision should be logged");
+
+        let _ = std::fs::remove_dir_all(app_data_dir);
     }
 }

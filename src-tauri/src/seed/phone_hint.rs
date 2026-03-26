@@ -42,9 +42,11 @@ struct PhoneAdmin1Item {
 /// Idempotent for seeded records (matched by source marker).
 pub fn seed(conn: &Connection) -> Result<usize, String> {
     let hint_type_id: String = conn
-        .query_row("SELECT id FROM hint_type WHERE code = 'phone_hint'", [], |row| {
-            row.get(0)
-        })
+        .query_row(
+            "SELECT id FROM hint_type WHERE code = 'phone_hint'",
+            [],
+            |row| row.get(0),
+        )
         .map_err(|e| format!("hint_type 'phone_hint' not found: {}", e))?;
 
     let countries: PhoneCountryCatalog = serde_json::from_str(COUNTRY_CODES_JSON)
@@ -88,7 +90,11 @@ pub fn seed(conn: &Connection) -> Result<usize, String> {
                  WHERE region_id = ?1
                    AND hint_type_id = ?2
                    AND source_note LIKE ?3",
-                rusqlite::params![region_id, hint_type_id, format!("{COUNTRY_SOURCE_PREFIX} %")],
+                rusqlite::params![
+                    region_id,
+                    hint_type_id,
+                    format!("{COUNTRY_SOURCE_PREFIX} %")
+                ],
                 |row| row.get(0),
             )
             .map_err(|e| e.to_string())?;
@@ -125,7 +131,12 @@ pub fn seed(conn: &Connection) -> Result<usize, String> {
                 source_note,
             ],
         )
-        .map_err(|e| format!("Failed to seed phone_hint for country {}: {}", country_code, e))?;
+        .map_err(|e| {
+            format!(
+                "Failed to seed phone_hint for country {}: {}",
+                country_code, e
+            )
+        })?;
         created += 1;
     }
 

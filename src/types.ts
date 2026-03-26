@@ -65,6 +65,24 @@ export interface AssetEditorItem {
   country_codes: string[];
 }
 
+export interface AssetUsageInfo {
+  hint_id: string;
+  link_field: string;
+  hint_type_code: string;
+  hint_type_title: string;
+  region_id: string;
+  region_name: string;
+  region_level: string;
+  country_code?: string | null;
+  short_value?: string | null;
+  full_value?: string | null;
+  source_note?: string | null;
+  confidence: number;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface BatchMutationResult {
   affected: number;
 }

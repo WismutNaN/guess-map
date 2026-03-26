@@ -170,7 +170,12 @@ mod tests {
         .unwrap()
     }
 
-    fn create_admin1(conn: &Connection, country_code: &str, geometry_ref: &str, name: &str) -> String {
+    fn create_admin1(
+        conn: &Connection,
+        country_code: &str,
+        geometry_ref: &str,
+        name: &str,
+    ) -> String {
         let country_id: String = conn
             .query_row(
                 "SELECT id FROM region WHERE country_code = ?1 AND region_level = 'country'",

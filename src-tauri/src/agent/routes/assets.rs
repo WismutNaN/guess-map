@@ -64,8 +64,7 @@ pub async fn upload_asset(
         .decode(payload.data.trim())
         .or_else(|_| {
             // Also try URL-safe base64
-            base64::engine::general_purpose::URL_SAFE
-                .decode(payload.data.trim())
+            base64::engine::general_purpose::URL_SAFE.decode(payload.data.trim())
         })
         .map_err(|e| ApiError::validation(format!("Invalid base64 data: {}", e)))?;
 
@@ -93,8 +92,8 @@ pub async fn upload_asset(
         created_by: Some("agent".to_string()),
     };
 
-    let asset = asset::service::save_asset(&mut conn, &assets_dir, input)
-        .map_err(ApiError::validation)?;
+    let asset =
+        asset::service::save_asset(&mut conn, &assets_dir, input).map_err(ApiError::validation)?;
 
     Ok((StatusCode::CREATED, Json(AssetDto::from(asset))))
 }

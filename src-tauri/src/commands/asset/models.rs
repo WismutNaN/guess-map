@@ -26,6 +26,25 @@ pub struct AssetEditorItem {
     pub country_codes: Vec<String>,
 }
 
+#[derive(Debug, Serialize, Clone)]
+pub struct AssetUsageInfo {
+    pub hint_id: String,
+    pub link_field: String,
+    pub hint_type_code: String,
+    pub hint_type_title: String,
+    pub region_id: String,
+    pub region_name: String,
+    pub region_level: String,
+    pub country_code: Option<String>,
+    pub short_value: Option<String>,
+    pub full_value: Option<String>,
+    pub source_note: Option<String>,
+    pub confidence: f64,
+    pub created_by: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
 #[derive(Debug, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct UploadAssetInput {
@@ -56,4 +75,11 @@ pub struct CropAssetInput {
     pub height: u32,
     pub caption: Option<String>,
     pub updated_by: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct DeleteAssetInput {
+    pub asset_id: String,
+    pub deleted_by: Option<String>,
 }

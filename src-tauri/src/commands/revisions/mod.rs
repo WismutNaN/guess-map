@@ -1,6 +1,6 @@
 use crate::db::DbState;
-use rusqlite::types::Value;
 use rusqlite::params_from_iter;
+use rusqlite::types::Value;
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
