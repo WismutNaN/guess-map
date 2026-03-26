@@ -1,4 +1,5 @@
 import maplibregl from "maplibre-gl";
+import { patchCountryISOCodes } from "../geoPatch";
 
 /**
  * Load region GeoJSON sources and add country/admin1 border layers.
@@ -13,6 +14,7 @@ export async function addRegionLayers(map: maplibregl.Map) {
 async function addCountryLayers(map: maplibregl.Map) {
   const resp = await fetch("/geodata/ne_countries.geojson");
   const data = await resp.json();
+  patchCountryISOCodes(data);
 
   map.addSource("regions-countries", { type: "geojson", data });
 
