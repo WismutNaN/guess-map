@@ -158,7 +158,25 @@ pub fn bootstrap_runtime(
         let conn = db_state.conn.lock().map_err(|e| e.to_string())?;
         let enabled = get_bool_setting(&conn, KEY_ENABLED, false);
         let port = get_port_setting(&conn);
-        let token_hash = settings::get(&conn, KEY_TOKEN_HASH).and_then(non_empty);
+        let token_hash = if enabled {
+            match settings::get(&conn, KEY_TOKEN_HASH).and_then(non_empty) {
+                Some(hash) => Some(hash),
+                None => {
+                    // Self-heal: if API is enabled but token is missing, generate one.
+                    let token = auth::generate_token();
+                    let hash = auth::hash_token(&token);
+                    settings::set(&conn, KEY_TOKEN_HASH, &hash).map_err(|e| e.to_string())?;
+                    settings::set(&conn, KEY_TOKEN_PREVIEW, &token_preview(&token))
+                        .map_err(|e| e.to_string())?;
+                    log::warn!(
+                        "Agent API enabled but token was missing; generated a new token hash"
+                    );
+                    Some(hash)
+                }
+            }
+        } else {
+            settings::get(&conn, KEY_TOKEN_HASH).and_then(non_empty)
+        };
         (enabled, port, token_hash)
     };
 
@@ -245,23 +263,30 @@ pub fn agent_regenerate_token(
     db: State<'_, DbState>,
     server_state: State<'_, AgentServerState>,
 ) -> Result<RegenerateTokenResponse, String> {
+    let enabled = {
+        let conn = db.conn.lock().map_err(|e| e.to_string())?;
+        get_bool_setting(&conn, KEY_ENABLED, false)
+    };
+
+    if !enabled {
+        return Err(
+            "Agent API is disabled. Enable Agent API and save settings before regenerating token."
+                .to_string(),
+        );
+    }
+
     let token = auth::generate_token();
     let token_hash = auth::hash_token(&token);
 
-    let (enabled, port) = {
+    let port = {
         let conn = db.conn.lock().map_err(|e| e.to_string())?;
         settings::set(&conn, KEY_TOKEN_HASH, &token_hash).map_err(|e| e.to_string())?;
         settings::set(&conn, KEY_TOKEN_PREVIEW, &token_preview(&token))
             .map_err(|e| e.to_string())?;
-        (
-            get_bool_setting(&conn, KEY_ENABLED, false),
-            get_port_setting(&conn),
-        )
+        get_port_setting(&conn)
     };
 
-    if enabled {
-        server_state.start_or_restart(port, token_hash)?;
-    }
+    server_state.start_or_restart(port, token_hash)?;
 
     let settings = {
         let conn = db.conn.lock().map_err(|e| e.to_string())?;

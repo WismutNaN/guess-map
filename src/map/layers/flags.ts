@@ -4,14 +4,126 @@ import { registerLayerGroup } from "../layerManager";
 
 const SOURCE_ID = "hint-flags";
 const LAYER_ID = "hint-flags";
+const IMAGE_ID_PREFIX = "flag-icon:";
+const IMAGE_ID_PROPERTY = "icon_image_id";
+
+type FlagProperties = GeoJSON.GeoJsonProperties & {
+  icon_asset_id?: string;
+  icon_image_id?: string;
+  short_value?: string;
+  country_code?: string;
+};
+
+type FlagFeatureCollection = GeoJSON.FeatureCollection<GeoJSON.Geometry, FlagProperties>;
+
+const mapsWithMissingImageHandler = new WeakSet<maplibregl.Map>();
+const flagImageLoadsInFlight = new Map<string, Promise<void>>();
+
+function normalizeText(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function imageIdForAsset(assetId: string): string {
+  return `${IMAGE_ID_PREFIX}${assetId}`;
+}
+
+function assetIdFromImageId(imageId: string): string | null {
+  if (!imageId.startsWith(IMAGE_ID_PREFIX)) return null;
+  return normalizeText(imageId.slice(IMAGE_ID_PREFIX.length));
+}
+
+function applyIconImageIds(data: FlagFeatureCollection): string[] {
+  const ids = new Set<string>();
+
+  for (const feature of data.features) {
+    const props: FlagProperties = feature.properties ?? {};
+    const iconAssetId = normalizeText(props.icon_asset_id);
+    if (iconAssetId) {
+      props[IMAGE_ID_PROPERTY] = imageIdForAsset(iconAssetId);
+      ids.add(iconAssetId);
+    } else {
+      delete props[IMAGE_ID_PROPERTY];
+    }
+    feature.properties = props;
+  }
+
+  return [...ids];
+}
+
+async function loadImageElement(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Failed to decode image"));
+    image.src = src;
+  });
+}
+
+async function ensureFlagImage(map: maplibregl.Map, assetId: string): Promise<void> {
+  const imageId = imageIdForAsset(assetId);
+  if (map.hasImage(imageId)) {
+    return;
+  }
+
+  const existingLoad = flagImageLoadsInFlight.get(imageId);
+  if (existingLoad) {
+    return existingLoad;
+  }
+
+  const loadPromise = (async () => {
+    const dataUrl = await invoke<string>("get_asset_data_url", { assetId });
+    const image = await loadImageElement(dataUrl);
+    if (!map.hasImage(imageId)) {
+      map.addImage(imageId, image);
+    }
+  })()
+    .catch((error) => {
+      console.warn(`Failed to load flag icon for asset ${assetId}:`, error);
+    })
+    .finally(() => {
+      flagImageLoadsInFlight.delete(imageId);
+    });
+
+  flagImageLoadsInFlight.set(imageId, loadPromise);
+  return loadPromise;
+}
+
+function bindStyleImageMissingHandler(map: maplibregl.Map) {
+  if (mapsWithMissingImageHandler.has(map)) {
+    return;
+  }
+
+  map.on("styleimagemissing", (event) => {
+    const imageId = normalizeText((event as { id?: unknown }).id);
+    if (!imageId) return;
+
+    const assetId = assetIdFromImageId(imageId);
+    if (!assetId) return;
+
+    void ensureFlagImage(map, assetId);
+  });
+
+  mapsWithMissingImageHandler.add(map);
+}
+
+function preloadFlagImages(map: maplibregl.Map, assetIds: string[]) {
+  for (const assetId of assetIds) {
+    void ensureFlagImage(map, assetId);
+  }
+}
 
 /**
  * Add flag label layer.
- * Renders country codes at anchor coordinates from compiled hint GeoJSON.
- * Will switch to SVG flag icons when image management is implemented.
+ * Renders SVG icons from icon_asset_id when available.
+ * Falls back to text short_value/country_code when an icon is missing.
  */
 export async function addFlagLayer(map: maplibregl.Map) {
   const data = await loadFlagGeoJson();
+  const iconAssetIds = applyIconImageIds(data);
+  bindStyleImageMissingHandler(map);
+  preloadFlagImages(map, iconAssetIds);
 
   if (!map.getSource(SOURCE_ID)) {
     map.addSource(SOURCE_ID, {
@@ -28,7 +140,26 @@ export async function addFlagLayer(map: maplibregl.Map) {
       minzoom: 2,
       maxzoom: 8,
       layout: {
-        "text-field": ["get", "country_code"],
+        "icon-image": ["get", IMAGE_ID_PROPERTY],
+        "icon-size": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          2,
+          0.07,
+          4,
+          0.1,
+          7,
+          0.14,
+        ],
+        "icon-allow-overlap": false,
+        "icon-optional": true,
+        "text-field": [
+          "case",
+          ["has", IMAGE_ID_PROPERTY],
+          "",
+          ["coalesce", ["get", "short_value"], ["get", "country_code"]],
+        ],
         "text-size": [
           "interpolate",
           ["linear"],
@@ -62,6 +193,9 @@ export async function refreshFlagLayer(map: maplibregl.Map) {
     return;
   }
   const data = await loadFlagGeoJson();
+  const iconAssetIds = applyIconImageIds(data);
+  bindStyleImageMissingHandler(map);
+  preloadFlagImages(map, iconAssetIds);
   source.setData(data);
 }
 
@@ -87,5 +221,5 @@ async function loadFlagGeoJson() {
     hintTypeCode: "flag",
   });
 
-  return JSON.parse(geojsonStr) as GeoJSON.FeatureCollection<GeoJSON.Geometry>;
+  return JSON.parse(geojsonStr) as FlagFeatureCollection;
 }

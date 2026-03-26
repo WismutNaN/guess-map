@@ -197,7 +197,7 @@ export function Settings({ open, onClose }: SettingsProps) {
                 <button
                   type="button"
                   onClick={handleRegenerateToken}
-                  disabled={saving}
+                  disabled={saving || !settings.enabled}
                 >
                   {settings.hasToken ? "Regenerate token" : "Generate token"}
                 </button>
@@ -211,6 +211,7 @@ export function Settings({ open, onClose }: SettingsProps) {
               </div>
               <div className="settings-hint">
                 Full token is shown only right after generation/regeneration.
+                {!settings.enabled && " Enable Agent API and save settings first."}
               </div>
             </div>
 

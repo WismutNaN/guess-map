@@ -2,7 +2,9 @@ mod models;
 pub(crate) mod service;
 
 use crate::db::DbState;
+use base64::Engine;
 pub use models::{AssetInfo, UploadAssetInput};
+use rusqlite::OptionalExtension;
 use tauri::{Manager, State};
 
 #[tauri::command]
@@ -19,6 +21,57 @@ pub fn upload_asset_bytes(
     let assets_dir = app_data_dir.join("assets");
     let mut conn = db.conn.lock().map_err(|e| e.to_string())?;
     service::save_asset(&mut conn, &assets_dir, input)
+}
+
+#[tauri::command]
+pub fn get_asset_data_url(
+    app: tauri::AppHandle,
+    db: State<'_, DbState>,
+    asset_id: String,
+) -> Result<String, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let row: Option<(String, Option<String>)> = conn
+        .query_row(
+            "SELECT file_path, mime_type FROM asset WHERE id = ?1",
+            [&asset_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .optional()
+        .map_err(|e| e.to_string())?;
+
+    let (file_path, mime_type) = row.ok_or_else(|| format!("Asset '{}' not found", asset_id))?;
+
+    let app_data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let normalized_path = file_path.replace('\\', "/");
+    let full_path = app_data_dir.join(&normalized_path);
+    let bytes = std::fs::read(&full_path)
+        .map_err(|e| format!("Failed to read asset file '{}': {}", full_path.display(), e))?;
+
+    let mime = mime_type
+        .or_else(|| infer_mime_from_file_path(&normalized_path))
+        .unwrap_or_else(|| "application/octet-stream".to_string());
+    let encoded = base64::engine::general_purpose::STANDARD.encode(bytes);
+
+    Ok(format!("data:{};base64,{}", mime, encoded))
+}
+
+fn infer_mime_from_file_path(file_path: &str) -> Option<String> {
+    let ext = std::path::Path::new(file_path)
+        .extension()
+        .and_then(|value| value.to_str())
+        .map(|value| value.to_ascii_lowercase())?;
+
+    let mime = match ext.as_str() {
+        "svg" => "image/svg+xml",
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "webp" => "image/webp",
+        "gif" => "image/gif",
+        "bmp" => "image/bmp",
+        _ => return None,
+    };
+
+    Some(mime.to_string())
 }
 
 #[cfg(test)]

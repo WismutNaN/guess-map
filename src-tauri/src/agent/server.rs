@@ -22,13 +22,18 @@ pub fn start(context: AgentApiContext, port: u16) -> Result<ServerHandle, String
         .set_nonblocking(true)
         .map_err(|e| format!("Failed to set non-blocking listener: {}", e))?;
 
-    let listener = tokio::net::TcpListener::from_std(std_listener)
-        .map_err(|e| format!("Failed to create async listener: {}", e))?;
-
     let router = routes::build_router(context);
     let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
 
     tauri::async_runtime::spawn(async move {
+        let listener = match tokio::net::TcpListener::from_std(std_listener) {
+            Ok(listener) => listener,
+            Err(error) => {
+                log::error!("Failed to create async listener: {}", error);
+                return;
+            }
+        };
+
         let server = axum::serve(listener, router).with_graceful_shutdown(async move {
             let _ = shutdown_rx.await;
         });

@@ -165,6 +165,7 @@ pub fn run() {
             commands::settings::get_setting_or,
             commands::settings::set_setting,
             commands::asset::upload_asset_bytes,
+            commands::asset::get_asset_data_url,
             commands::hints::get_hint_types,
             commands::hints::get_hint_counts,
             commands::hints::get_hints_by_region,
