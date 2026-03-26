@@ -93,6 +93,11 @@ fn seed_data(conn: &rusqlite::Connection) {
         Err(e) => eprintln!("Failed to seed flags: {}", e),
         _ => {}
     }
+    match seed::country_domain::seed(conn) {
+        Ok(n) if n > 0 => eprintln!("Seeded {} country_domain hints", n),
+        Err(e) => eprintln!("Failed to seed country_domain: {}", e),
+        _ => {}
+    }
 }
 
 fn ensure_routes_imported(conn: &rusqlite::Connection, geodata_dir: &Path) {

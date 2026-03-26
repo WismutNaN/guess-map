@@ -68,6 +68,7 @@ const REGION_LEVEL_SIZE: maplibregl.ExpressionSpecification = [
 const TYPE_PRIORITY: Record<string, number> = {
   flag: 0,
   phone_hint: 10,
+  country_domain: 15,
   script_sample: 20,
   camera_generation: 30,
   sign: 40,

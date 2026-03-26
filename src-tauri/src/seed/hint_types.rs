@@ -133,6 +133,15 @@ const BUILTIN_TYPES: &[HintTypeSeed] = &[
         ),
         sort_order: 14,
     },
+    HintTypeSeed {
+        code: "country_domain",
+        title: "Country Domain",
+        display_family: "text",
+        schema_json: Some(
+            r#"{"properties":{"tld":{"type":"string"},"country_code":{"type":"string"}}}"#,
+        ),
+        sort_order: 15,
+    },
 ];
 
 /// Seed built-in hint types. Idempotent — uses INSERT OR IGNORE per type,

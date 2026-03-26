@@ -24,6 +24,8 @@
  *   by-country <json>                   Create hint for all regions of a country/level
  *   fill-flags-svg [--country XX] [--force] [--no-compile]
  *                                        Upload SVG flags and upsert country flag hints
+ *   fill-country-domains [--country XX] [--force] [--no-compile]
+ *                                        Upsert country_domain hints (.ru, .uk, ...)
  *   upload-asset <file> [--kind K] [--caption C]   Upload image file
  *   upload-asset-url <url> [--name N] [--kind K] [--caption C]  Download & upload image
  *   compile [code1,code2,...]           Recompile hint layers
@@ -39,6 +41,11 @@ const TOKEN = process.env.GM_API_TOKEN;
 const BASE = `http://${HOST}:${PORT}`;
 const FLAG_ICONS_VERSION = "7.5.0";
 const FLAG_ICONS_BASE = `https://cdn.jsdelivr.net/gh/lipis/flag-icons@${FLAG_ICONS_VERSION}/flags/4x3`;
+const COUNTRY_DOMAIN_HINT_TYPE = "country_domain";
+const COUNTRY_DOMAIN_SOURCE = "seed:country_tld";
+const COUNTRY_TLD_OVERRIDES = {
+  GB: "uk",
+};
 
 if (!TOKEN) {
   console.error(
@@ -86,6 +93,24 @@ function countryCodeToFlagEmoji(code) {
   return [...code.toUpperCase()]
     .map((ch) => String.fromCodePoint(0x1f1e6 + ch.charCodeAt(0) - 65))
     .join("");
+}
+
+function countryCodeToDomain(code) {
+  if (!/^[A-Za-z]{2}$/.test(code || "")) return null;
+  const upper = code.toUpperCase();
+  const suffix = COUNTRY_TLD_OVERRIDES[upper] || upper.toLowerCase();
+  return `.${suffix}`;
+}
+
+async function ensureHintTypeExists(code) {
+  const resp = await api("GET", "/api/hint-types");
+  const items = Array.isArray(resp?.items) ? resp.items : [];
+  const exists = items.some((item) => item?.code === code && item?.is_active !== false);
+  if (exists) return;
+
+  console.error(`Hint type '${code}' not found in the current database.`);
+  console.error("Restart GuessMap after updating backend seed data, then retry.");
+  process.exit(1);
 }
 
 async function uploadAssetFromUrl(
@@ -416,6 +441,181 @@ async function cmdFillFlagsSvg(args) {
   });
 }
 
+async function cmdFillCountryDomains(args) {
+  let countryFilter = null;
+  let force = false;
+  let noCompile = false;
+
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "--country") countryFilter = (args[++i] || "").toUpperCase();
+    else if (args[i] === "--force") force = true;
+    else if (args[i] === "--no-compile") noCompile = true;
+  }
+
+  if (countryFilter && !/^[A-Z]{2}$/.test(countryFilter)) {
+    console.error("Usage: fill-country-domains [--country XX] [--force] [--no-compile]");
+    process.exit(1);
+  }
+
+  await ensureHintTypeExists(COUNTRY_DOMAIN_HINT_TYPE);
+
+  const params = new URLSearchParams({
+    region_level: "country",
+    limit: "2000",
+  });
+  if (countryFilter) params.set("country_code", countryFilter);
+
+  const regionResp = await api("GET", `/api/regions?${params.toString()}`);
+  const countries = Array.isArray(regionResp.items) ? regionResp.items : [];
+  if (countries.length === 0) {
+    console.error("No countries found for the requested filter.");
+    return;
+  }
+
+  let created = 0;
+  let updated = 0;
+  let migrated = 0;
+  let skipped = 0;
+  let failed = 0;
+
+  for (let i = 0; i < countries.length; i++) {
+    const country = countries[i];
+    const code = String(country.country_code || "").toUpperCase();
+    const name = country.name || country.name_en || country.id;
+
+    if (!/^[A-Z]{2}$/.test(code)) {
+      skipped++;
+      console.error(`[${i + 1}/${countries.length}] skip ${name}: invalid code '${code}'`);
+      continue;
+    }
+
+    const tld = countryCodeToDomain(code);
+    if (!tld) {
+      skipped++;
+      console.error(`[${i + 1}/${countries.length}] skip ${name}: cannot derive ccTLD`);
+      continue;
+    }
+
+    const regionId = encodeURIComponent(country.id);
+    const region = await api("GET", `/api/regions/${regionId}`);
+    const hints = Array.isArray(region.hints) ? region.hints : [];
+    const domainHints = hints.filter((h) => h.hint_type_code === COUNTRY_DOMAIN_HINT_TYPE);
+    const legacyDomainNotes = hints.filter(
+      (h) =>
+        h.hint_type_code === "note" &&
+        typeof h.source_note === "string" &&
+        h.source_note.startsWith(COUNTRY_DOMAIN_SOURCE)
+    );
+    const preferred =
+      domainHints.find(
+        (h) =>
+          typeof h.source_note === "string" &&
+          h.source_note.startsWith(COUNTRY_DOMAIN_SOURCE)
+      ) ||
+      domainHints[0] ||
+      legacyDomainNotes[0] ||
+      null;
+    const needsTypeMigration =
+      preferred && preferred.hint_type_code !== COUNTRY_DOMAIN_HINT_TYPE;
+    const sourceNote = `${COUNTRY_DOMAIN_SOURCE} ${code} ${tld}`;
+    const existingData =
+      preferred && preferred.data_json && typeof preferred.data_json === "object"
+        ? preferred.data_json
+        : {};
+    const dataJson = {
+      ...existingData,
+      tld,
+      country_code: code,
+    };
+
+    if (
+      !force &&
+      !needsTypeMigration &&
+      preferred?.short_value &&
+      String(preferred.short_value).trim().length > 0
+    ) {
+      skipped++;
+      console.error(`[${i + 1}/${countries.length}] skip ${code}: already has domain hint`);
+      continue;
+    }
+
+    try {
+      if (preferred) {
+        await api(
+          "PUT",
+          `/api/hints/${encodeURIComponent(preferred.id)}`,
+          {
+            region_id: preferred.region_id || country.id,
+            hint_type_code: COUNTRY_DOMAIN_HINT_TYPE,
+            short_value: tld,
+            full_value: `Country domain for ${name}`,
+            data_json: dataJson,
+            color: preferred.color ?? null,
+            confidence: preferred.confidence ?? 1.0,
+            min_zoom: preferred.min_zoom ?? 2.0,
+            max_zoom: preferred.max_zoom ?? 8.0,
+            is_visible: preferred.is_visible ?? true,
+            image_asset_id: preferred.image_asset_id ?? null,
+            icon_asset_id: preferred.icon_asset_id ?? null,
+            source_note: sourceNote,
+          },
+          { fatal: false }
+        );
+        if (needsTypeMigration) {
+          migrated++;
+          console.error(`[${i + 1}/${countries.length}] migrated ${code}: note -> ${COUNTRY_DOMAIN_HINT_TYPE} (${tld})`);
+        } else {
+          updated++;
+          console.error(`[${i + 1}/${countries.length}] updated ${code}: ${tld}`);
+        }
+      } else {
+        await api(
+          "POST",
+          "/api/hints",
+          {
+            region_id: country.id,
+            hint_type_code: COUNTRY_DOMAIN_HINT_TYPE,
+            short_value: tld,
+            full_value: `Country domain for ${name}`,
+            data_json: dataJson,
+            confidence: 1.0,
+            min_zoom: 2.0,
+            max_zoom: 8.0,
+            is_visible: true,
+            source_note: sourceNote,
+          },
+          { fatal: false }
+        );
+        created++;
+        console.error(`[${i + 1}/${countries.length}] created ${code}: ${tld}`);
+      }
+    } catch (error) {
+      failed++;
+      console.error(
+        `[${i + 1}/${countries.length}] failed ${code} (${name}): ${String(error)}`
+      );
+    }
+  }
+
+  if (!noCompile && (created > 0 || updated > 0 || migrated > 0)) {
+    await api("POST", "/api/layers/compile", {
+      hint_type_codes: [COUNTRY_DOMAIN_HINT_TYPE],
+    });
+  }
+
+  printJson({
+    hint_type_code: COUNTRY_DOMAIN_HINT_TYPE,
+    source: COUNTRY_DOMAIN_SOURCE,
+    countries_total: countries.length,
+    created,
+    updated,
+    migrated,
+    skipped,
+    failed,
+    compiled: !noCompile && (created > 0 || updated > 0 || migrated > 0),
+  });
+}
+
 async function cmdCompile(codes) {
   const payload = {};
   if (codes) {
@@ -469,6 +669,9 @@ switch (command) {
   case "fill-flags-svg":
     await cmdFillFlagsSvg(args);
     break;
+  case "fill-country-domains":
+    await cmdFillCountryDomains(args);
+    break;
   case "upload-asset":
     await cmdUploadAsset(args[0], args.slice(1));
     break;
@@ -496,6 +699,8 @@ Commands:
   by-country '<json>'                   Hint for all regions of country/level
   fill-flags-svg [--country XX] [--force] [--no-compile]
                                         Upload SVG flags + upsert country hints
+  fill-country-domains [--country XX] [--force] [--no-compile]
+                                        Upsert country_domain hints (.ru, .uk, ...)
   upload-asset <file> [--kind K] [--caption C]
   upload-asset-url <url> [--name N] [--kind K] [--caption C]
   compile [code1,code2,...]             Recompile layers

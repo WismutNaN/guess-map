@@ -74,6 +74,10 @@ node scripts/gm-agent.mjs create-hint '{"region_id":"country-de","hint_type_code
 # Create hints for all admin1 regions of a country
 node scripts/gm-agent.mjs by-country '{"country_code":"DE","region_level":"admin1","hint_type_code":"driving_side","short_value":"Right","data_json":{"side":"right"},"color":"#AA0000"}'
 
+# Fill country domain hints (.ru, .uk, ...)
+node scripts/gm-agent.mjs fill-country-domains
+node scripts/gm-agent.mjs fill-country-domains --country GB --force
+
 # Batch create hints (JSON file or string)
 node scripts/gm-agent.mjs batch-hints hints.json
 
@@ -92,6 +96,7 @@ node scripts/gm-agent.mjs delete-hint <hint-id>
 | `driving_side` | polygon_fill | `side`: left/right/mixed | Driving side |
 | `script_sample` | image | — | Script/alphabet sample |
 | `phone_hint` | text | `prefix`, `format` | Phone number format |
+| `country_domain` | text | `tld`, `country_code` | Country ccTLD/domain (`.ru`, `.uk`, ...) |
 | `road_marking` | image | `marking_type` | Road marking style |
 | `sign` | image | `sign_type` | Road signs |
 | `pole` | image | `material`, `color` | Utility poles |
@@ -103,6 +108,13 @@ node scripts/gm-agent.mjs delete-hint <hint-id>
 | `note` | text | — | Free-form note |
 | `camera_generation` | polygon_fill | `generation`: gen1-gen4/mixed/unknown | Camera generation |
 | `highway` | line | `route_system`, `route_number`, `direction` | Highway/route |
+
+### Layering Policy
+
+- Every repeatable fact type must use its own `hint_type` (separate toggle/layer in UI).
+- Do **not** store structured, repeatable datasets in `note`.
+- `note` is only for one-off free-form comments.
+- If no matching `hint_type` exists for a repeatable dataset, add a new `hint_type` first, then import data.
 
 ### Workflow: Populating Hints from Web Sources
 

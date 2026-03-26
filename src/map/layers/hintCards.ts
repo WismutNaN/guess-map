@@ -52,6 +52,7 @@ const KNOWN_HINT_COLORS: Record<string, string> = {
   pole: "#a855f7",
   bollard: "#ef4444",
   phone_hint: "#0ea5e9",
+  country_domain: "#0284c7",
   camera_meta: "#2563eb",
   camera_generation: "#6366f1",
   car_type: "#14b8a6",
