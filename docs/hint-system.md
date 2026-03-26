@@ -141,7 +141,7 @@
 | `pole` | image | — | Столбы и опоры |
 | `bollard` | icon | — | Болларды |
 | `coverage` | polygon_fill | — | Покрытие Google/другими |
-| `camera_meta` | text | left | Поколение камеры |
+| `camera_meta` | text | left | Google Car (признаки машины/камеры) |
 | `car_type` | icon | — | Тип машины съёмки |
 | `vegetation` | icon | — | Растительность |
 | `note` | text | — | Произвольная заметка |

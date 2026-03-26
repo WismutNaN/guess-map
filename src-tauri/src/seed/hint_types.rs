@@ -83,7 +83,7 @@ const BUILTIN_TYPES: &[HintTypeSeed] = &[
     },
     HintTypeSeed {
         code: "camera_meta",
-        title: "Camera Meta",
+        title: "Google Car",
         display_family: "text",
         schema_json: Some(
             r#"{"properties":{"generation":{"type":"string"},"has_blur":{"type":"boolean"}}}"#,

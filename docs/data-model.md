@@ -213,7 +213,7 @@
 | `pole` | Столб/опора | `image` | `{material: string, color: string}` |
 | `bollard` | Болларды | `image` | `{bollard_type: string}` |
 | `coverage` | Покрытие | `polygon_fill` | `{provider: string, year: number}` |
-| `camera_meta` | Метаданные камеры | `text` | `{generation: string, has_blur: boolean}` |
+| `camera_meta` | Google Car | `text` | `{generation: string, has_blur: boolean}` |
 | `car_type` | Тип машины съёмки | `icon` | `{brand: string, model: string, color: string}` |
 | `vegetation` | Растительность | `icon` | `{biome: string, key_species: string}` |
 | `note` | Заметка | `text` | — |

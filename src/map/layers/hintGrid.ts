@@ -17,6 +17,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type { HintTypeInfo } from "../../types";
 import { registerLayerGroup } from "../layerManager";
 import {
+  colorForHintCode,
   createHintImageCard,
   createHintTextCard,
   setHintCardImage,
@@ -263,20 +264,28 @@ function applyImageIds(data: FC, ht: HintTypeInfo): void {
 // Per-region grid layout
 // ---------------------------------------------------------------------------
 
+/**
+ * Groups features by anchor coordinates (rounded to ~2 km).
+ * This merges regions whose anchors overlap (e.g. Israel + Palestine)
+ * into one grid so their cards don't stack on top of each other.
+ */
 function regionKey(
   f: GeoJSON.Feature<GeoJSON.Geometry, Props>,
   idx: number,
 ): string {
-  const rid = norm(f.properties?.region_id);
-  if (rid) return rid;
   const g = f.geometry;
   if (g?.type === "Point" && Array.isArray(g.coordinates)) {
     const lng = Number(g.coordinates[0]);
     const lat = Number(g.coordinates[1]);
     if (Number.isFinite(lng) && Number.isFinite(lat)) {
-      return `pt:${lng.toFixed(4)}:${lat.toFixed(4)}`;
+      // Round to 0.02° (~2 km) to catch near-duplicate anchors
+      const rlng = Math.round(lng * 50);
+      const rlat = Math.round(lat * 50);
+      return `${rlng}:${rlat}`;
     }
   }
+  const rid = norm(f.properties?.region_id);
+  if (rid) return `r:${rid}`;
   return `f:${idx}`;
 }
 
@@ -477,6 +486,158 @@ async function loadHintGeoJson(code: string): Promise<FC> {
 }
 
 // ---------------------------------------------------------------------------
+// Click popup — enlarged image + details
+// ---------------------------------------------------------------------------
+
+const popupByMap = new WeakMap<maplibregl.Map, maplibregl.Popup>();
+const clickBound = new WeakSet<maplibregl.Map>();
+
+function closePopup(map: maplibregl.Map) {
+  const popup = popupByMap.get(map);
+  if (popup) {
+    popup.remove();
+    popupByMap.delete(map);
+  }
+}
+
+function toPopupLngLat(
+  feature: maplibregl.MapGeoJSONFeature,
+  fallback: maplibregl.LngLat,
+): maplibregl.LngLatLike {
+  const geom = feature.geometry;
+  if (geom.type === "Point" && Array.isArray(geom.coordinates)) {
+    const [lng, lat] = geom.coordinates;
+    if (typeof lng === "number" && typeof lat === "number") {
+      return [lng, lat];
+    }
+  }
+  return [fallback.lng, fallback.lat];
+}
+
+function buildPopupContent(
+  props: Record<string, unknown>,
+  state: GridState,
+): HTMLDivElement {
+  const root = document.createElement("div");
+  root.className = "hint-image-popup";
+
+  const hintCode = String(props.hint_type_code ?? "");
+  const ht = state.types.get(hintCode);
+  const accent = colorForHintCode(hintCode);
+
+  // Header: coloured badge + title
+  const header = document.createElement("div");
+  header.className = "hint-grid-popup-header";
+
+  const badge = document.createElement("span");
+  badge.className = "hint-grid-popup-badge";
+  badge.style.background = accent;
+  badge.textContent = ht?.title ?? hintCode.replace(/_/g, " ");
+  header.appendChild(badge);
+
+  const regionName =
+    norm(props.region_name as string) ??
+    norm(props.country_code as string);
+  if (regionName) {
+    const region = document.createElement("span");
+    region.className = "hint-grid-popup-region";
+    region.textContent = regionName;
+    header.appendChild(region);
+  }
+  root.appendChild(header);
+
+  // Value text
+  const shortVal = norm(props.short_value as string);
+  const fullVal = norm(props.full_value as string);
+  if (shortVal || fullVal) {
+    const val = document.createElement("div");
+    val.className = "hint-grid-popup-value";
+    val.textContent = shortVal ?? fullVal ?? "";
+    root.appendChild(val);
+    if (shortVal && fullVal && shortVal !== fullVal) {
+      const desc = document.createElement("div");
+      desc.className = "hint-image-popup-body";
+      desc.textContent = fullVal;
+      root.appendChild(desc);
+    }
+  }
+
+  // Image placeholder (filled async)
+  const assetId =
+    norm(props.image_asset_id as string) ??
+    norm(props.icon_asset_id as string);
+  if (assetId) {
+    const figure = document.createElement("div");
+    figure.className = "hint-image-popup-figure";
+    const img = document.createElement("img");
+    img.loading = "lazy";
+    img.alt = shortVal ?? "Hint image";
+    figure.appendChild(img);
+    root.appendChild(figure);
+
+    // Load full-size image
+    void invoke<string>("get_asset_data_url", { assetId })
+      .then((url) => {
+        img.src = url;
+      })
+      .catch((e) => console.warn("[HintGrid] popup image:", e));
+  }
+
+  // Source note
+  const sourceNote = norm(props.source_note as string);
+  if (sourceNote) {
+    const meta = document.createElement("div");
+    meta.className = "hint-image-popup-meta";
+    meta.textContent = sourceNote;
+    root.appendChild(meta);
+  }
+
+  return root;
+}
+
+function bindClickPopup(map: maplibregl.Map) {
+  if (clickBound.has(map)) return;
+
+  map.on("mouseenter", LAYER_ID, () => {
+    map.getCanvas().style.cursor = "pointer";
+  });
+  map.on("mouseleave", LAYER_ID, () => {
+    map.getCanvas().style.cursor = "";
+  });
+
+  map.on("click", LAYER_ID, (event) => {
+    const feature = event.features?.[0];
+    if (!feature) return;
+
+    if (event.originalEvent instanceof MouseEvent) {
+      event.originalEvent.stopPropagation();
+    }
+
+    const state = stateByMap.get(map);
+    if (!state) return;
+
+    const props = feature.properties ?? {};
+    const lngLat = toPopupLngLat(feature, event.lngLat);
+
+    closePopup(map);
+
+    const popup = new maplibregl.Popup({
+      closeButton: true,
+      closeOnClick: true,
+      maxWidth: "420px",
+      className: "hint-image-popup-shell",
+    })
+      .setLngLat(lngLat)
+      .setDOMContent(buildPopupContent(props, state))
+      .addTo(map);
+
+    popupByMap.set(map, popup);
+  });
+
+  clickBound.add(map);
+}
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
@@ -557,6 +718,9 @@ export async function addHintGridLayer(
   for (const code of types.keys()) {
     registerLayerGroup(code, []);
   }
+
+  // Click popup for enlarged view
+  bindClickPopup(map);
 }
 
 /**
