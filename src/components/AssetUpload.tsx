@@ -5,9 +5,10 @@ import type { AssetInfo } from "../types";
 interface AssetUploadProps {
   value: AssetInfo | null;
   onChange: (asset: AssetInfo | null) => void;
+  kind?: "sample" | "icon";
 }
 
-export function AssetUpload({ value, onChange }: AssetUploadProps) {
+export function AssetUpload({ value, onChange, kind = "sample" }: AssetUploadProps) {
   const [uploading, setUploading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
@@ -30,7 +31,7 @@ export function AssetUpload({ value, onChange }: AssetUploadProps) {
         input: {
           fileName: file.name,
           bytes,
-          kind: "sample",
+          kind,
           createdBy: "user",
         },
       });
@@ -58,7 +59,7 @@ export function AssetUpload({ value, onChange }: AssetUploadProps) {
           disabled={uploading}
           onChange={onFileSelected}
         />
-        {uploading ? "Uploading..." : "Upload image"}
+        {uploading ? "Uploading..." : kind === "icon" ? "Upload icon" : "Upload image"}
       </label>
 
       {(previewUrl || value) && (

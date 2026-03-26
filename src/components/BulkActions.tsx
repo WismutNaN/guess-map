@@ -18,8 +18,8 @@ const DRIVING_SIDE_COLORS: Record<DrivingSide, string> = {
   mixed: "#D9A84A",
 };
 
-/** Hint types whose display_family is image-oriented. */
-const IMAGE_FAMILIES = new Set(["image", "icon"]);
+/** Hint types whose display_family can carry a linked asset. */
+const ATTACHABLE_FAMILIES = new Set(["image", "icon", "composite"]);
 
 const MAX_PREVIEW = 8;
 
@@ -49,7 +49,13 @@ export function BulkActions({
     [hintTypes, hintTypeCode]
   );
   const isDrivingSide = hintTypeCode === "driving_side";
-  const isImageType = selectedType ? IMAGE_FAMILIES.has(selectedType.display_family) : false;
+  const isAttachableType = selectedType
+    ? ATTACHABLE_FAMILIES.has(selectedType.display_family)
+    : false;
+  const uploadKind: "sample" | "icon" =
+    selectedType?.display_family === "icon" || selectedType?.display_family === "composite"
+      ? "icon"
+      : "sample";
   const count = selectedRegions.length;
 
   const previewNames = useMemo(
@@ -96,6 +102,13 @@ export function BulkActions({
     setError(null);
   }, [count]);
 
+  useEffect(() => {
+    if (!isAttachableType || mode === "delete") {
+      setExpanded(false);
+      setAsset(null);
+    }
+  }, [isAttachableType, mode]);
+
   if (count <= 1) return null;
 
   const handleSubmit = async () => {
@@ -114,7 +127,10 @@ export function BulkActions({
           confidence: Number.parseFloat(confidence) || 1,
           isVisible: true,
           createdBy: "user",
-          imageAssetId: asset?.id ?? null,
+          imageAssetId:
+            uploadKind === "sample" && isAttachableType ? asset?.id ?? null : null,
+          iconAssetId:
+            uploadKind === "icon" && isAttachableType ? asset?.id ?? null : null,
         };
 
         const payload = isDrivingSide
@@ -234,14 +250,18 @@ export function BulkActions({
               title="Confidence (0\u20131)"
             />
             {/* Image attach toggle */}
-            {isImageType && !expanded && (
+            {isAttachableType && !expanded && (
               <button
                 type="button"
                 className="btn-secondary bulk-bar-attach"
                 onClick={() => setExpanded(true)}
-                title="Attach image to all hints"
+                title={
+                  uploadKind === "icon"
+                    ? "Attach icon to all hints"
+                    : "Attach image to all hints"
+                }
               >
-                + Image
+                {uploadKind === "icon" ? "+ Icon" : "+ Image"}
               </button>
             )}
           </>
@@ -267,9 +287,9 @@ export function BulkActions({
       </div>
 
       {/* Expanded: image upload row */}
-      {expanded && mode === "apply" && (
+      {expanded && mode === "apply" && isAttachableType && (
         <div className="bulk-bar-image-row">
-          <AssetUpload value={asset} onChange={setAsset} />
+          <AssetUpload value={asset} onChange={setAsset} kind={uploadKind} />
           <button
             type="button"
             className="btn-secondary"
@@ -278,7 +298,7 @@ export function BulkActions({
               setAsset(null);
             }}
           >
-            Cancel image
+            {uploadKind === "icon" ? "Cancel icon" : "Cancel image"}
           </button>
         </div>
       )}
