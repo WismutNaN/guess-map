@@ -13,7 +13,10 @@ fn test_full_import_pipeline_with_real_data() {
         .join("assets/geodata/ne_countries.geojson");
 
     if !countries_path.exists() {
-        eprintln!("Skipping: countries geodata not found at {:?}", countries_path);
+        eprintln!(
+            "Skipping: countries geodata not found at {:?}",
+            countries_path
+        );
         return;
     }
 

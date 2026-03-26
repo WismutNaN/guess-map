@@ -9,23 +9,41 @@ vi.mock("@tauri-apps/api/core", () => ({
 }));
 
 function setupInvokeMocks() {
+  setupInvokeMocksWithData(
+    [
+      {
+        id: "ht-note",
+        code: "note",
+        title: "Note",
+        display_family: "text",
+        schema_json: null,
+        sort_order: 12,
+        is_active: true,
+      },
+    ],
+    { note: 3 }
+  );
+}
+
+function setupInvokeMocksWithData(
+  hintTypes: Array<{
+    id: string;
+    code: string;
+    title: string;
+    display_family: string;
+    schema_json: string | null;
+    sort_order: number;
+    is_active: boolean;
+  }>,
+  counts: Record<string, number>
+) {
   invokeMock.mockImplementation((command: string) => {
     if (command === "get_hint_types") {
-      return Promise.resolve([
-        {
-          id: "ht-note",
-          code: "note",
-          title: "Note",
-          display_family: "text",
-          schema_json: null,
-          sort_order: 12,
-          is_active: true,
-        },
-      ]);
+      return Promise.resolve(hintTypes);
     }
 
     if (command === "get_hint_counts") {
-      return Promise.resolve({ note: 3 });
+      return Promise.resolve(counts);
     }
 
     return Promise.resolve(null);
@@ -79,5 +97,37 @@ describe("LayerPanel overlays", () => {
     fireEvent.change(slider, { target: { value: "52" } });
 
     expect(onCoverageOpacityChange).toHaveBeenCalledWith(0.52);
+  });
+
+  it("hides overlay-managed hint types from generic hint list", async () => {
+    setupInvokeMocksWithData(
+      [
+        {
+          id: "ht-note",
+          code: "note",
+          title: "Note",
+          display_family: "text",
+          schema_json: null,
+          sort_order: 12,
+          is_active: true,
+        },
+        {
+          id: "ht-coverage",
+          code: "coverage",
+          title: "Coverage",
+          display_family: "polygon_fill",
+          schema_json: null,
+          sort_order: 8,
+          is_active: true,
+        },
+      ],
+      { note: 3, coverage: 9 }
+    );
+
+    render(<LayerPanel onToggle={vi.fn()} />);
+
+    expect(await screen.findByLabelText(/GSV Coverage/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Coverage$/i)).toBeNull();
+    expect(await screen.findByText(/^Note$/i)).toBeInTheDocument();
   });
 });

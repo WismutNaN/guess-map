@@ -126,7 +126,10 @@ fn parse_feature_collection(json: &str, label: &str) -> Result<FeatureCollection
         .map_err(|e| format!("Not a FeatureCollection: {}", e))
 }
 
-fn prop_str<'a>(props: &'a serde_json::Map<String, serde_json::Value>, key: &str) -> Option<&'a str> {
+fn prop_str<'a>(
+    props: &'a serde_json::Map<String, serde_json::Value>,
+    key: &str,
+) -> Option<&'a str> {
     props.get(key).and_then(|v| v.as_str())
 }
 
@@ -246,7 +249,9 @@ mod tests {
         assert_eq!(count, 1);
 
         let code: String = conn
-            .query_row("SELECT country_code FROM region LIMIT 1", [], |row| row.get(0))
+            .query_row("SELECT country_code FROM region LIMIT 1", [], |row| {
+                row.get(0)
+            })
             .unwrap();
         assert_eq!(code, "XK");
     }

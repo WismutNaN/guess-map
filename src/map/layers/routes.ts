@@ -1,3 +1,4 @@
+import { invoke } from "@tauri-apps/api/core";
 import maplibregl from "maplibre-gl";
 import { registerLayerGroup } from "../layerManager";
 
@@ -5,14 +6,14 @@ const SOURCE_ID = "routes";
 const LINE_LAYER_ID = "routes-line";
 const LABEL_LAYER_ID = "routes-label";
 const CASING_LAYER_ID = "routes-casing";
-const ROUTES_DATA_URL = "/geodata/routes.geojson";
+const HINT_TYPE_CODE = "highway";
+const ROUTE_LAYER_IDS = [CASING_LAYER_ID, LINE_LAYER_ID, LABEL_LAYER_ID] as const;
 
 async function loadRoutesGeoJson() {
-  const response = await fetch(ROUTES_DATA_URL);
-  if (!response.ok) {
-    throw new Error(`Failed to load routes GeoJSON (${response.status})`);
-  }
-  return (await response.json()) as GeoJSON.FeatureCollection<GeoJSON.Geometry>;
+  const geojsonStr = await invoke<string>("compile_line_layer", {
+    hintTypeCode: HINT_TYPE_CODE,
+  });
+  return JSON.parse(geojsonStr) as GeoJSON.FeatureCollection<GeoJSON.Geometry>;
 }
 
 /**
@@ -99,5 +100,30 @@ export async function addRouteLayers(map: maplibregl.Map) {
     },
   });
 
-  registerLayerGroup("routes", [CASING_LAYER_ID, LINE_LAYER_ID, LABEL_LAYER_ID], false);
+  registerLayerGroup("routes", [...ROUTE_LAYER_IDS], false);
+}
+
+export async function refreshRouteLayers(map: maplibregl.Map) {
+  const source = map.getSource(SOURCE_ID) as maplibregl.GeoJSONSource | undefined;
+  if (!source) {
+    return;
+  }
+  const data = await loadRoutesGeoJson();
+  source.setData(data);
+}
+
+export function setRoutesCountryFilter(map: maplibregl.Map, countryCode?: string | null) {
+  const filter = countryCode
+    ? ([
+        "any",
+        ["==", ["get", "country_code"], countryCode],
+        ["in", countryCode, ["get", "countries"]],
+      ] as maplibregl.FilterSpecification)
+    : null;
+
+  for (const layerId of ROUTE_LAYER_IDS) {
+    if (map.getLayer(layerId)) {
+      map.setFilter(layerId, filter);
+    }
+  }
 }

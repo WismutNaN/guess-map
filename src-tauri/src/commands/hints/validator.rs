@@ -118,7 +118,10 @@ pub(crate) fn validate_data_json(
 
         if let Some(enum_values) = field_schema.get("enum").and_then(Value::as_array) {
             if !enum_values.iter().any(|allowed| allowed == value) {
-                return Err(format!("Field '{}' has invalid enum value '{}'", field, value));
+                return Err(format!(
+                    "Field '{}' has invalid enum value '{}'",
+                    field, value
+                ));
             }
         }
     }

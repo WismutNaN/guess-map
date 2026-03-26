@@ -160,7 +160,10 @@ fn write_response(
         Cache-Control: public, max-age=86400\r\n\
         Connection: close\r\n\
         \r\n",
-        status, reason, content_type, body.len()
+        status,
+        reason,
+        content_type,
+        body.len()
     );
     stream.write_all(header.as_bytes())?;
     stream.write_all(body)?;

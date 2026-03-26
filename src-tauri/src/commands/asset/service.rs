@@ -42,15 +42,7 @@ pub(crate) fn save_asset(
     )
     .map_err(|e| e.to_string())?;
 
-    revision::log(
-        &tx,
-        "asset",
-        &asset_id,
-        "create",
-        None,
-        &created_by,
-        None,
-    )?;
+    revision::log(&tx, "asset", &asset_id, "create", None, &created_by, None)?;
     tx.commit().map_err(|e| e.to_string())?;
 
     Ok(AssetInfo {

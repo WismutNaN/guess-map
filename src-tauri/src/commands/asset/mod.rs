@@ -74,7 +74,11 @@ mod tests {
             .strip_prefix("assets/")
             .expect("relative path must start with assets/");
         let full_path = assets_dir.join(file_name);
-        assert!(full_path.exists(), "asset file not created: {:?}", full_path);
+        assert!(
+            full_path.exists(),
+            "asset file not created: {:?}",
+            full_path
+        );
 
         let db_count: usize = conn
             .query_row("SELECT COUNT(*) FROM asset", [], |row| row.get(0))
@@ -82,7 +86,11 @@ mod tests {
         assert_eq!(db_count, 1);
 
         let rev_count: usize = conn
-            .query_row("SELECT COUNT(*) FROM revision_log WHERE entity_type='asset'", [], |row| row.get(0))
+            .query_row(
+                "SELECT COUNT(*) FROM revision_log WHERE entity_type='asset'",
+                [],
+                |row| row.get(0),
+            )
             .unwrap();
         assert_eq!(rev_count, 1);
 

@@ -232,6 +232,20 @@ body {
   cursor: pointer;
 }
 
+.overlay-filter-block {
+  padding: 2px 12px 8px;
+}
+
+.overlay-filter-select {
+  width: 100%;
+  background: #151b2e;
+  color: #edf1ff;
+  border: 1px solid #324066;
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 12px;
+}
+
 .region-inspector {
   position: absolute;
   top: 58px;

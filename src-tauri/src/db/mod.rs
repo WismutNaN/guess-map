@@ -14,7 +14,9 @@ impl DbState {
         let conn = Connection::open(db_path)?;
 
         // Enable WAL mode for concurrent access
-        conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000; PRAGMA foreign_keys=ON;")?;
+        conn.execute_batch(
+            "PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000; PRAGMA foreign_keys=ON;",
+        )?;
 
         // Run migrations
         migrations::run_all(&conn)?;

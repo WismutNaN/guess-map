@@ -19,11 +19,9 @@ pub fn seed(conn: &Connection) -> Result<usize, String> {
     }
 
     let hint_type_id: String = conn
-        .query_row(
-            "SELECT id FROM hint_type WHERE code = 'flag'",
-            [],
-            |row| row.get(0),
-        )
+        .query_row("SELECT id FROM hint_type WHERE code = 'flag'", [], |row| {
+            row.get(0)
+        })
         .map_err(|e| format!("hint_type 'flag' not found: {}", e))?;
 
     let mut stmt = conn
@@ -36,9 +34,7 @@ pub fn seed(conn: &Connection) -> Result<usize, String> {
         .filter_map(|r| r.ok())
         .collect();
 
-    let tx = conn
-        .unchecked_transaction()
-        .map_err(|e| e.to_string())?;
+    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
 
     let mut count = 0;
     for (region_id, country_code, name) in &countries {

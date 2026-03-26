@@ -1,8 +1,14 @@
 use rusqlite::Connection;
 
 const MIGRATIONS: &[(&str, &str)] = &[
-    ("001_initial", include_str!("../../migrations/001_initial.sql")),
-    ("002_line_and_route", include_str!("../../migrations/002_line_and_route.sql")),
+    (
+        "001_initial",
+        include_str!("../../migrations/001_initial.sql"),
+    ),
+    (
+        "002_line_and_route",
+        include_str!("../../migrations/002_line_and_route.sql"),
+    ),
 ];
 
 pub fn run_all(conn: &Connection) -> Result<(), rusqlite::Error> {
@@ -10,7 +16,7 @@ pub fn run_all(conn: &Connection) -> Result<(), rusqlite::Error> {
         "CREATE TABLE IF NOT EXISTS _migrations (
             name TEXT PRIMARY KEY,
             applied_at TEXT NOT NULL DEFAULT (datetime('now'))
-        );"
+        );",
     )?;
 
     for (name, sql) in MIGRATIONS {
@@ -22,10 +28,7 @@ pub fn run_all(conn: &Connection) -> Result<(), rusqlite::Error> {
 
         if !already_applied {
             conn.execute_batch(sql)?;
-            conn.execute(
-                "INSERT INTO _migrations (name) VALUES (?1)",
-                [name],
-            )?;
+            conn.execute("INSERT INTO _migrations (name) VALUES (?1)", [name])?;
             log::info!("Applied migration: {}", name);
         }
     }

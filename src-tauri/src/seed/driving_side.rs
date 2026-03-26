@@ -3,12 +3,11 @@ use uuid::Uuid;
 
 /// Countries that drive on the left side of the road.
 const LEFT_DRIVING: &[&str] = &[
-    "AI", "AG", "AU", "BS", "BD", "BB", "BM", "BT", "BW", "BN", "KY", "CX", "CC", "CK",
-    "CY", "DM", "FK", "FJ", "GD", "GG", "GY", "HK", "IN", "ID", "IE", "IM", "JM", "JP",
-    "JE", "KE", "KI", "LS", "MO", "MW", "MY", "MV", "MT", "MU", "MS", "MZ", "NA", "NR",
-    "NP", "NZ", "NU", "NF", "PK", "PG", "PN", "KN", "LC", "VC", "WS", "SC", "SG", "SB",
-    "ZA", "LK", "SH", "SR", "SZ", "TZ", "TH", "TL", "TK", "TO", "TT", "TC", "TV", "UG",
-    "GB", "VG", "VI", "ZM", "ZW",
+    "AI", "AG", "AU", "BS", "BD", "BB", "BM", "BT", "BW", "BN", "KY", "CX", "CC", "CK", "CY", "DM",
+    "FK", "FJ", "GD", "GG", "GY", "HK", "IN", "ID", "IE", "IM", "JM", "JP", "JE", "KE", "KI", "LS",
+    "MO", "MW", "MY", "MV", "MT", "MU", "MS", "MZ", "NA", "NR", "NP", "NZ", "NU", "NF", "PK", "PG",
+    "PN", "KN", "LC", "VC", "WS", "SC", "SG", "SB", "ZA", "LK", "SH", "SR", "SZ", "TZ", "TH", "TL",
+    "TK", "TO", "TT", "TC", "TV", "UG", "GB", "VG", "VI", "ZM", "ZW",
 ];
 
 /// Seed driving_side hints for all countries. Idempotent.
@@ -48,9 +47,7 @@ pub fn seed(conn: &Connection) -> Result<usize, String> {
         .filter_map(|r| r.ok())
         .collect();
 
-    let tx = conn
-        .unchecked_transaction()
-        .map_err(|e| e.to_string())?;
+    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
 
     let mut count = 0;
     for (region_id, country_code) in &countries {

@@ -21,7 +21,9 @@ const BUILTIN_TYPES: &[HintTypeSeed] = &[
         code: "driving_side",
         title: "Driving Side",
         display_family: "polygon_fill",
-        schema_json: Some(r#"{"properties":{"side":{"type":"string","enum":["left","right","mixed"]}},"required":["side"]}"#),
+        schema_json: Some(
+            r#"{"properties":{"side":{"type":"string","enum":["left","right","mixed"]}},"required":["side"]}"#,
+        ),
         sort_order: 1,
     },
     HintTypeSeed {
@@ -35,7 +37,9 @@ const BUILTIN_TYPES: &[HintTypeSeed] = &[
         code: "phone_hint",
         title: "Phone Hint",
         display_family: "text",
-        schema_json: Some(r#"{"properties":{"prefix":{"type":"string"},"format":{"type":"string"}}}"#),
+        schema_json: Some(
+            r#"{"properties":{"prefix":{"type":"string"},"format":{"type":"string"}}}"#,
+        ),
         sort_order: 3,
     },
     HintTypeSeed {
@@ -56,7 +60,9 @@ const BUILTIN_TYPES: &[HintTypeSeed] = &[
         code: "pole",
         title: "Pole / Utility Post",
         display_family: "image",
-        schema_json: Some(r#"{"properties":{"material":{"type":"string"},"color":{"type":"string"}}}"#),
+        schema_json: Some(
+            r#"{"properties":{"material":{"type":"string"},"color":{"type":"string"}}}"#,
+        ),
         sort_order: 6,
     },
     HintTypeSeed {
@@ -70,28 +76,36 @@ const BUILTIN_TYPES: &[HintTypeSeed] = &[
         code: "coverage",
         title: "Coverage",
         display_family: "polygon_fill",
-        schema_json: Some(r#"{"properties":{"provider":{"type":"string"},"year":{"type":"number"}}}"#),
+        schema_json: Some(
+            r#"{"properties":{"provider":{"type":"string"},"year":{"type":"number"}}}"#,
+        ),
         sort_order: 8,
     },
     HintTypeSeed {
         code: "camera_meta",
         title: "Camera Meta",
         display_family: "text",
-        schema_json: Some(r#"{"properties":{"generation":{"type":"string"},"has_blur":{"type":"boolean"}}}"#),
+        schema_json: Some(
+            r#"{"properties":{"generation":{"type":"string"},"has_blur":{"type":"boolean"}}}"#,
+        ),
         sort_order: 9,
     },
     HintTypeSeed {
         code: "car_type",
         title: "Survey Car Type",
         display_family: "icon",
-        schema_json: Some(r#"{"properties":{"brand":{"type":"string"},"model":{"type":"string"},"color":{"type":"string"}}}"#),
+        schema_json: Some(
+            r#"{"properties":{"brand":{"type":"string"},"model":{"type":"string"},"color":{"type":"string"}}}"#,
+        ),
         sort_order: 10,
     },
     HintTypeSeed {
         code: "vegetation",
         title: "Vegetation",
         display_family: "icon",
-        schema_json: Some(r#"{"properties":{"biome":{"type":"string"},"key_species":{"type":"string"}}}"#),
+        schema_json: Some(
+            r#"{"properties":{"biome":{"type":"string"},"key_species":{"type":"string"}}}"#,
+        ),
         sort_order: 11,
     },
     HintTypeSeed {
@@ -102,11 +116,22 @@ const BUILTIN_TYPES: &[HintTypeSeed] = &[
         sort_order: 12,
     },
     HintTypeSeed {
+        code: "camera_generation",
+        title: "Camera Generation",
+        display_family: "polygon_fill",
+        schema_json: Some(
+            r#"{"properties":{"generation":{"type":"string","enum":["gen1","gen2","gen3","gen4","mixed","unknown"]}}}"#,
+        ),
+        sort_order: 13,
+    },
+    HintTypeSeed {
         code: "highway",
         title: "Highway / Route",
         display_family: "line",
-        schema_json: Some(r#"{"properties":{"route_system":{"type":"string","enum":["us_interstate","us_highway","european_e","national","other"]},"route_number":{"type":"string"},"direction":{"type":"string","enum":["N-S","E-W","NE-SW","NW-SE"]}},"required":["route_system","route_number"]}"#),
-        sort_order: 13,
+        schema_json: Some(
+            r#"{"properties":{"route_system":{"type":"string","enum":["us_interstate","us_highway","european_e","national","other"]},"route_number":{"type":"string"},"direction":{"type":"string","enum":["N-S","E-W","NE-SW","NW-SE"]}},"required":["route_system","route_number"]}"#,
+        ),
+        sort_order: 14,
     },
 ];
 

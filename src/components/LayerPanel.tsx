@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { DEFAULT_COVERAGE_OPACITY } from "../map/layers/coverage";
-import { OVERLAY_LAYERS } from "../map/overlays";
+import { isOverlayManagedHintType, OVERLAY_LAYERS } from "../map/overlays";
 import type { HintTypeInfo } from "../types";
 import { HintSection } from "./layers/HintSection";
 import { OverlaySection } from "./layers/OverlaySection";
@@ -12,6 +12,9 @@ interface LayerPanelProps {
   refreshSignal?: number;
   coverageOpacity?: number;
   onCoverageOpacityChange?: (opacity: number) => void;
+  routesFilterMode?: "all" | "selected_country";
+  selectedCountryCode?: string | null;
+  onRoutesFilterModeChange?: (mode: "all" | "selected_country") => void;
 }
 
 export function LayerPanel({
@@ -19,6 +22,9 @@ export function LayerPanel({
   refreshSignal = 0,
   coverageOpacity = DEFAULT_COVERAGE_OPACITY,
   onCoverageOpacityChange,
+  routesFilterMode = "all",
+  selectedCountryCode,
+  onRoutesFilterModeChange,
 }: LayerPanelProps) {
   const [hintTypes, setHintTypes] = useState<HintTypeInfo[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
@@ -40,7 +46,14 @@ export function LayerPanel({
       invoke<Record<string, number>>("get_hint_counts"),
     ]).then(([types, c]) => {
       if (cancelled) return;
-      const activeTypes = types.filter((t) => t.is_active);
+      // Some hint types are rendered via dedicated overlay groups/UI (coverage, routes),
+      // so they must not appear in the generic hint toggle list.
+      const activeTypes = types.filter(
+        (t) =>
+          t.is_active &&
+          t.display_family !== "line" &&
+          !isOverlayManagedHintType(t.code)
+      );
       setHintTypes(activeTypes);
       setCounts(c);
       setVisibility((prev) => {
@@ -82,8 +95,11 @@ export function LayerPanel({
           <OverlaySection
             visibility={visibility}
             coverageOpacityPercent={coverageOpacityLocal}
+            routesFilterMode={routesFilterMode}
+            selectedCountryCode={selectedCountryCode}
             onToggle={handleToggle}
             onCoverageOpacityChange={handleCoverageOpacityChange}
+            onRoutesFilterModeChange={(mode) => onRoutesFilterModeChange?.(mode)}
           />
           <HintSection
             hintTypes={hintTypes}

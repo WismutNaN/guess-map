@@ -2,11 +2,12 @@ pub mod commands;
 pub mod compiler;
 pub mod db;
 pub mod import;
-pub mod services;
 pub mod seed;
+pub mod services;
 pub mod tile_server;
 
 use db::DbState;
+use std::path::Path;
 use std::path::PathBuf;
 use tauri::Manager;
 
@@ -33,7 +34,7 @@ fn find_geodata_dir() -> PathBuf {
     PathBuf::from("assets/geodata")
 }
 
-fn init_db_and_import(db_state: &DbState) {
+fn init_db_and_import(db_state: &DbState, geodata_dir: &Path) {
     let conn = db_state.conn.lock().unwrap();
 
     // Check if regions already imported
@@ -44,12 +45,11 @@ fn init_db_and_import(db_state: &DbState) {
     if count > 0 {
         // Seed hint types and data even if regions exist (idempotent)
         seed_data(&conn);
+        ensure_routes_imported(&conn, geodata_dir);
         return;
     }
 
     log::info!("First run: importing geodata...");
-
-    let geodata_dir = find_geodata_dir();
 
     // Import countries
     let countries_path = geodata_dir.join("ne_countries.geojson");
@@ -73,6 +73,7 @@ fn init_db_and_import(db_state: &DbState) {
 
     // Seed hint types and data
     seed_data(&conn);
+    ensure_routes_imported(&conn, geodata_dir);
 }
 
 fn seed_data(conn: &rusqlite::Connection) {
@@ -93,6 +94,29 @@ fn seed_data(conn: &rusqlite::Connection) {
     }
 }
 
+fn ensure_routes_imported(conn: &rusqlite::Connection, geodata_dir: &Path) {
+    let existing: usize = conn
+        .query_row(
+            "SELECT COUNT(*) FROM region WHERE region_level = 'route'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
+
+    if existing > 0 {
+        return;
+    }
+
+    let routes_path = geodata_dir.join("routes.geojson");
+    match std::fs::read_to_string(&routes_path) {
+        Ok(json) => match import::routes::import_routes(conn, &json) {
+            Ok(n) => log::info!("Imported {} routes", n),
+            Err(e) => log::error!("Failed to import routes: {}", e),
+        },
+        Err(e) => log::error!("Failed to read routes file {:?}: {}", routes_path, e),
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -101,11 +125,17 @@ pub fn run() {
         .setup(|app| {
             let db_path = get_db_path(app);
             eprintln!("Database path: {:?}", db_path);
+            let geodata_dir = find_geodata_dir();
 
-            let db_state =
-                DbState::new(&db_path).expect("Failed to initialize database");
+            let db_state = DbState::new(&db_path).expect("Failed to initialize database");
 
-            init_db_and_import(&db_state);
+            {
+                let conn = db_state.conn.lock().unwrap();
+                let geodata_dir_str = geodata_dir.to_string_lossy();
+                let _ = db::settings::set(&conn, "geodata.dir", geodata_dir_str.as_ref());
+            }
+
+            init_db_and_import(&db_state, &geodata_dir);
 
             // Start tile proxy server (local HTTP on 127.0.0.1)
             let tile_port = tile_server::start();
@@ -135,6 +165,7 @@ pub fn run() {
             commands::hints::delete_hint,
             commands::hints::compile_hint_layer,
             commands::hints::compile_polygon_enrichment,
+            commands::hints::compile_line_layer,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -9,6 +9,7 @@ import { Toolbar } from "./components/Toolbar";
 import { refreshHintTypeOnMap } from "./map/hintLayers";
 import { setLayerGroupVisibility } from "./map/layerManager";
 import { DEFAULT_COVERAGE_OPACITY, setCoverageOpacity } from "./map/layers/coverage";
+import { setRoutesCountryFilter } from "./map/layers/routes";
 import type { AppMode, RegionInfo } from "./types";
 import "./App.css";
 
@@ -18,6 +19,8 @@ interface RegionStats {
   total: number;
 }
 
+type RoutesFilterMode = "all" | "selected_country";
+
 function App() {
   const [stats, setStats] = useState<RegionStats | null>(null);
   const [zoom, setZoom] = useState(2);
@@ -25,6 +28,7 @@ function App() {
   const [selectedRegion, setSelectedRegion] = useState<RegionInfo | null>(null);
   const [layerPanelVersion, setLayerPanelVersion] = useState(0);
   const [coverageOpacity, setCoverageOpacityState] = useState(DEFAULT_COVERAGE_OPACITY);
+  const [routesFilterMode, setRoutesFilterMode] = useState<RoutesFilterMode>("all");
   const mapRef = useRef<maplibregl.Map | null>(null);
 
   useEffect(() => {
@@ -50,6 +54,17 @@ function App() {
       setCoverageOpacity(mapRef.current, opacity);
     }
   }, []);
+
+  const selectedCountryCode = selectedRegion?.country_code ?? null;
+
+  useEffect(() => {
+    if (!mapRef.current) {
+      return;
+    }
+    const filterCountry =
+      routesFilterMode === "selected_country" ? selectedCountryCode : null;
+    setRoutesCountryFilter(mapRef.current, filterCountry);
+  }, [routesFilterMode, selectedCountryCode]);
 
   const flyToRegion = useCallback((region: RegionInfo) => {
     const map = mapRef.current;
@@ -110,6 +125,9 @@ function App() {
         refreshSignal={layerPanelVersion}
         coverageOpacity={coverageOpacity}
         onCoverageOpacityChange={handleCoverageOpacityChange}
+        selectedCountryCode={selectedCountryCode}
+        routesFilterMode={routesFilterMode}
+        onRoutesFilterModeChange={setRoutesFilterMode}
       />
 
       {mode === "editor" && (

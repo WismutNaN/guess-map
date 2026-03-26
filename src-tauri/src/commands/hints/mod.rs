@@ -74,7 +74,10 @@ pub fn delete_hint(
 
 /// Compile a hint layer to GeoJSON (point source).
 #[tauri::command]
-pub fn compile_hint_layer(db: State<'_, DbState>, hint_type_code: String) -> Result<String, String> {
+pub fn compile_hint_layer(
+    db: State<'_, DbState>,
+    hint_type_code: String,
+) -> Result<String, String> {
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
     compiler::compile_point_layer(&conn, &hint_type_code)
 }
@@ -89,6 +92,16 @@ pub fn compile_polygon_enrichment(
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
     let map = compiler::compile_polygon_enrichment(&conn, &hint_type_code)?;
     serde_json::to_string(&map).map_err(|e| e.to_string())
+}
+
+/// Compile a line hint layer to GeoJSON (LineString/MultiLineString source).
+#[tauri::command]
+pub fn compile_line_layer(
+    db: State<'_, DbState>,
+    hint_type_code: String,
+) -> Result<String, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    compiler::compile_line_layer(&conn, &hint_type_code)
 }
 
 #[cfg(test)]

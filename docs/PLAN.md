@@ -194,6 +194,12 @@ GeoGuessr использует Google Street View. Охват GSV определ
 - **Маршруты**: OpenStreetMap highway data (будущий импорт)
 - **Camera generations**: [geohints.com](https://geohints.com/meta/cameraGens) — поколения камер по странам
 
+### Фактический статус на 2026-03-26
+
+Фаза **3.5 завершена**: coverage и routes работают через production-like pipeline.
+Routes больше не зависят от статического фронтенд-файла — используются импорт в SQLite + `compile_line_layer()`.
+Дублирующий `Coverage` в общем списке hints убран: coverage управляется только через overlay-секцию.
+
 ### Задачи
 
 | # | Задача | Файлы/модули |
@@ -201,13 +207,13 @@ GeoGuessr использует Google Street View. Охват GSV определ
 | 3.5.1 | ✅ GSV Coverage: raster tile overlay от Google SVV | `src/map/layers/coverage.ts` |
 | 3.5.2 | ✅ Toggle в LayerPanel для Coverage (отдельно от hint layers) | `src/components/LayerPanel.tsx` |
 | 3.5.3 | ✅ Регулировка прозрачности Coverage слоя | `src/map/layers/coverage.ts` |
-| 3.5.4 | Добавить `line` в display_family (миграция 002) | `src-tauri/migrations/002_line_display.sql` |
-| 3.5.5 | `compile_line_layer()` в LayerCompiler | `src-tauri/src/compiler/` |
-| 3.5.6 | Хранение line geometry: `geometry_ref` → внешний GeoJSON (аналогично странам) | `src-tauri/src/import/` |
-| 3.5.7 | Seed: camera_generation hint_type (polygon_fill) | `src-tauri/src/seed/` |
-| 3.5.8 | Импорт GeoJSON маршрутов (US Interstate, European E-roads) | `src-tauri/src/import/routes.rs` |
-| 3.5.9 | Рендеринг line layers на карте с data-driven styling | `src/map/layers/routes.ts` |
-| 3.5.10 | UI: маршруты в LayerPanel с фильтрацией по региону | `src/components/LayerPanel.tsx` |
+| 3.5.4 | ✅ Добавить `line` в display_family и `route` в region_level (миграция 002) | `src-tauri/migrations/002_line_and_route.sql` |
+| 3.5.5 | ✅ `compile_line_layer()` в LayerCompiler | `src-tauri/src/compiler/mod.rs` |
+| 3.5.6 | ✅ Хранение line geometry: `geometry_ref` → внешний GeoJSON (`routes:<route_id>`) | `src-tauri/src/import/routes.rs` |
+| 3.5.7 | ✅ Seed: `highway` (line) + `camera_generation` (polygon_fill) | `src-tauri/src/seed/hint_types.rs` |
+| 3.5.8 | ✅ Импорт GeoJSON маршрутов в БД (`region` + `region_hint`) | `src-tauri/src/import/routes.rs` |
+| 3.5.9 | ✅ Рендеринг line layers на карте с data-driven styling (через `compile_line_layer`) | `src/map/layers/routes.ts` |
+| 3.5.10 | ✅ UI: routes в LayerPanel + фильтрация по выбранной стране | `src/components/LayerPanel.tsx` |
 
 ### Изменения модели данных
 - `display_family` получает новое значение `'line'` — для линейной геометрии
@@ -219,18 +225,22 @@ GeoGuessr использует Google Street View. Охват GSV определ
 
 | Тип | Что тестируется |
 |-----|----------------|
-| Unit (TS) | Coverage layer добавляется/удаляется, opacity регулируется |
-| Unit (Rust) | `compile_line_layer` производит GeoJSON с LineString features |
-| Unit (Rust) | Import routes: парсинг GeoJSON, создание region + hint записей |
-| E2E | GSV Coverage видно на карте (синие линии) |
-| E2E | Toggle Coverage вкл/выкл работает |
+| Unit (TS) | ✅ Coverage layer: add source/layer, invalid port handling, opacity clamp |
+| Unit (TS) | ✅ LayerPanel overlays: toggle + сохранение visibility + slider opacity |
+| Unit (TS) | ✅ Routes layer: load/refresh/filter behavior |
+| Unit (Rust) | ✅ Tile proxy diagnostics (invalid path + network-dependent live tile test) |
+| Unit (Rust) | ✅ `compile_line_layer` производит GeoJSON с line geometry |
+| Unit (Rust) | ✅ Import routes: парсинг GeoJSON, upsert в `region` + `region_hint` |
+| E2E | ✅ GSV Coverage видно на карте и переключается |
+| E2E | ✅ Routes overlay отображается из SQLite/LayerCompiler pipeline |
 
-### Gate Criteria
+### Gate Criteria (закрытие Phase 3.5 в текущем скоупе)
 
-- [ ] GSV Coverage overlay видим на карте и переключается
-- [ ] `line` display_family работает в LayerCompiler
-- [ ] ≥ 1 набор маршрутов импортирован и отображается
-- [ ] Все тесты проходят
+- [x] GSV Coverage overlay видим на карте, переключается и имеет регулировку прозрачности
+- [x] Миграция 002 применена: `display_family='line'`, `region_level='route'`
+- [x] `line` display_family работает в LayerCompiler (`compile_line_layer`)
+- [x] ≥ 1 набор маршрутов импортирован в БД и отображается
+- [x] Текущий набор тестов проходит (`cargo test` + `npm test` + `npm run build`)
 
 ---
 
@@ -245,6 +255,24 @@ LLM-агент может программно читать и писать да
 - [Архитектура](architecture.md) §6 — конкурентный доступ к SQLite: WAL mode, connection pool, busy timeout
 - [Модель данных](data-model.md) §3.7 — `app_settings`: хранение порта, токена, auto-approve
 - [Система подсказок](hint-system.md) §7 — правила валидации при сохранении hint
+
+### Готовность к старту Phase 4 (на 2026-03-26)
+
+**Готово:**
+- CRUD и валидация hints уже реализованы и покрыты тестами (`create/update/delete`, schema validation, revision log)
+- Есть рабочие команды чтения справочников/регионов и инфраструктура `app_settings` (`get/set`)
+- SQLite уже работает в `WAL` + `busy_timeout` режиме
+- Есть устоявшийся паттерн модулей backend (`commands/*`, `services/*`, `repository`)
+- Есть рабочий пример локального HTTP-сервиса в рантайме (tile proxy), что снижает риск по сетевой части Phase 4
+
+**Не готово (нужно сделать в Phase 4):**
+- Отсутствует каркас `src-tauri/src/agent/*` (server/auth/routes/middleware/ws)
+- Нет token auth (hash/verify) и модели lifecycle токена
+- Нет connection pool (`r2d2`/`deadpool`) для конкурентного UI+API доступа
+- Нет OpenAPI/schema endpoint и контрактных integration-тестов HTTP API
+
+**Вывод:**  
+Переход к реализации **Phase 4 можно начинать сейчас**. Phase 3.5 закрыта, route backlog отсутствует.
 
 ### Задачи
 

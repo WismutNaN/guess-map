@@ -104,7 +104,10 @@ pub(crate) fn list_hints_by_type(
     Ok(hints)
 }
 
-pub(crate) fn query_hint_by_id(conn: &Connection, hint_id: &str) -> Result<Option<HintRecord>, String> {
+pub(crate) fn query_hint_by_id(
+    conn: &Connection,
+    hint_id: &str,
+) -> Result<Option<HintRecord>, String> {
     conn.query_row(
         "SELECT rh.id, rh.region_id, rh.hint_type_id, ht.code, rh.short_value, rh.full_value,
                 rh.data_json, rh.color, rh.confidence, rh.min_zoom, rh.max_zoom, rh.is_visible,
