@@ -5,13 +5,13 @@ import { applyMinConfidenceFilter, refreshHintTypeOnMap } from "../map/hintLayer
 import { setLayerGroupVisibility } from "../map/layerManager";
 import { DEFAULT_COVERAGE_OPACITY, setCoverageOpacity } from "../map/layers/coverage";
 import {
-  DEFAULT_FLAG_SIZE_SCALE,
-  setFlagSizeScale,
-} from "../map/layers/flags";
+  DEFAULT_GRID_SIZE_SCALE,
+  isHintGridCode,
+  setHintGridSizeScale,
+  setHintGridTypeVisibility,
+} from "../map/layers/hintGrid";
 import { setRoutesCountryFilter } from "../map/layers/routes";
 import { setEmptyRegionFilter } from "../map/layers/regions";
-import { applySlotLayout, setSlotLayoutScale } from "../map/layers/slots";
-import { setThematicHintSizeScale } from "../map/layers/thematicHints";
 import { applyDebugOverlayOptions } from "../map/debug";
 import {
   loadDisplaySettings,
@@ -65,12 +65,14 @@ export interface LayerState {
   initMap: (map: maplibregl.Map) => void;
   /** Bind to selectedCountryCode changes for routes filter */
   syncRoutesFilter: (countryCode: string | null) => void;
+  /** Clear stored map reference (e.g. when map view is unmounted) */
+  clearMap: () => void;
 }
 
 export function useLayerState(): LayerState {
   const mapRef = useRef<maplibregl.Map | null>(null);
   const [coverageOpacity, setCoverageOpacityVal] = useState(DEFAULT_COVERAGE_OPACITY);
-  const [flagSizeScale, setFlagSizeScaleVal] = useState(DEFAULT_FLAG_SIZE_SCALE);
+  const [flagSizeScale, setFlagSizeScaleVal] = useState(DEFAULT_GRID_SIZE_SCALE);
   const [minConfidence, setMinConfidenceVal] = useState(0);
   const [densityPreset, setDensityPreset] = useState<DensityPresetId>(
     DEFAULT_DENSITY_PRESET
@@ -111,7 +113,9 @@ export function useLayerState(): LayerState {
   const toggleLayer = useCallback((code: string, visible: boolean) => {
     if (mapRef.current) {
       setLayerGroupVisibility(mapRef.current, code, visible);
-      applySlotLayout(mapRef.current);
+      if (isHintGridCode(mapRef.current, code)) {
+        setHintGridTypeVisibility(mapRef.current, code, visible);
+      }
       applyDisplaySettingsToMap(mapRef.current);
     }
   }, [applyDisplaySettingsToMap]);
@@ -124,10 +128,7 @@ export function useLayerState(): LayerState {
   const handleFlagSizeScale = useCallback((scale: number) => {
     setFlagSizeScaleVal(scale);
     if (!mapRef.current) return;
-    setFlagSizeScale(mapRef.current, scale);
-    setThematicHintSizeScale(mapRef.current, scale);
-    setSlotLayoutScale(mapRef.current, scale);
-    applySlotLayout(mapRef.current);
+    setHintGridSizeScale(mapRef.current, scale);
   }, []);
 
   const onHintChanged = useCallback(
@@ -137,7 +138,6 @@ export function useLayerState(): LayerState {
         void refreshHintTypeOnMap(map, hintTypeCode).catch((err) =>
           console.error("Failed to refresh hint layer:", err)
         );
-        applySlotLayout(map);
         applyDisplaySettingsToMap(map);
       }
       bumpRefresh();
@@ -150,10 +150,8 @@ export function useLayerState(): LayerState {
       mapRef.current = map;
       applyMinConfidenceFilter(map, minConfidence);
       setCoverageOpacity(map, coverageOpacity);
-      setFlagSizeScale(map, flagSizeScale);
-      setThematicHintSizeScale(map, flagSizeScale);
-      setSlotLayoutScale(map, flagSizeScale);
-      applySlotLayout(map);
+      setHintGridSizeScale(map, flagSizeScale);
+
       applyDisplaySettingsToMap(map);
       setRefreshSignal((v) => v + 1);
     },
@@ -169,7 +167,15 @@ export function useLayerState(): LayerState {
     if (!mapRef.current) return;
     const filterCountry =
       routesFilterModeRef.current === "selected_country" ? countryCode : null;
-    setRoutesCountryFilter(mapRef.current, filterCountry);
+    try {
+      setRoutesCountryFilter(mapRef.current, filterCountry);
+    } catch {
+      mapRef.current = null;
+    }
+  }, []);
+
+  const clearMap = useCallback(() => {
+    mapRef.current = null;
   }, []);
 
   // Sync minConfidence to map
@@ -222,13 +228,10 @@ export function useLayerState(): LayerState {
     applyDisplaySettingsToMap(mapRef.current);
   }, [applyDisplaySettingsToMap]);
 
-  // Sync flag icon size to map
+  // Sync hint grid size scale to map
   useEffect(() => {
     if (!mapRef.current) return;
-    setFlagSizeScale(mapRef.current, flagSizeScale);
-    setThematicHintSizeScale(mapRef.current, flagSizeScale);
-    setSlotLayoutScale(mapRef.current, flagSizeScale);
-    applySlotLayout(mapRef.current);
+    setHintGridSizeScale(mapRef.current, flagSizeScale);
   }, [flagSizeScale]);
 
   // Sync empty region filter to map
@@ -283,5 +286,6 @@ export function useLayerState(): LayerState {
     onHintChanged,
     initMap,
     syncRoutesFilter,
+    clearMap,
   };
 }

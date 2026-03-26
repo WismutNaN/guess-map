@@ -11,7 +11,7 @@ pub fn compile_point_layer(conn: &Connection, hint_type_code: &str) -> Result<St
         .prepare(
             "SELECT rh.id, rh.short_value, rh.full_value, rh.data_json, rh.color,
                     rh.min_zoom, rh.max_zoom, rh.confidence,
-                    r.anchor_lng, r.anchor_lat, r.name, r.country_code, r.id as region_id,
+                    r.anchor_lng, r.anchor_lat, r.name, r.country_code, r.id as region_id, r.region_level,
                     rh.image_asset_id, rh.icon_asset_id, rh.source_note
              FROM region_hint rh
              JOIN region r ON rh.region_id = r.id
@@ -35,13 +35,15 @@ pub fn compile_point_layer(conn: &Connection, hint_type_code: &str) -> Result<St
             let region_name: String = row.get(10)?;
             let country_code: Option<String> = row.get(11)?;
             let region_id: String = row.get(12)?;
-            let image_asset_id: Option<String> = row.get(13)?;
-            let icon_asset_id: Option<String> = row.get(14)?;
-            let source_note: Option<String> = row.get(15)?;
+            let region_level: String = row.get(13)?;
+            let image_asset_id: Option<String> = row.get(14)?;
+            let icon_asset_id: Option<String> = row.get(15)?;
+            let source_note: Option<String> = row.get(16)?;
 
             let mut properties = serde_json::Map::new();
             properties.insert("id".into(), json!(id));
             properties.insert("region_id".into(), json!(region_id));
+            properties.insert("region_level".into(), json!(region_level));
             properties.insert("region_name".into(), json!(region_name));
             properties.insert("country_code".into(), json!(country_code));
             properties.insert("short_value".into(), json!(short_value));

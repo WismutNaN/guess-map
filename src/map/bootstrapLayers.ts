@@ -3,11 +3,10 @@ import {
   addCityLayers,
   addCoverageLayer,
   addDrivingSideLayer,
-  addFlagLayer,
+  addHintGridLayer,
   addNoteLayer,
   addRegionLayers,
   addRouteLayers,
-  addThematicHintLayers,
 } from "./layers";
 
 type LayerBootstrapStep = {
@@ -21,8 +20,8 @@ const LAYER_BOOTSTRAP_STEPS: LayerBootstrapStep[] = [
   { label: "city layers", run: addCityLayers },
   // Coverage must stay below hint symbols so flags/notes remain readable.
   { label: "coverage layer", run: addCoverageLayer },
-  { label: "flag layer", run: addFlagLayer },
-  { label: "thematic hint layers", run: addThematicHintLayers },
+  // Unified hint grid — replaces separate flag + thematic hint layers.
+  { label: "hint grid layer", run: addHintGridLayer },
   { label: "note layer", run: addNoteLayer },
   { label: "route layers", run: addRouteLayers },
 ];

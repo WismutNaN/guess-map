@@ -3,7 +3,7 @@ pub(crate) mod service;
 
 use crate::db::DbState;
 use base64::Engine;
-pub use models::{AssetInfo, UploadAssetInput};
+pub use models::{AssetEditorItem, AssetInfo, CropAssetInput, ReplaceAssetInput, UploadAssetInput};
 use rusqlite::OptionalExtension;
 use tauri::{Manager, State};
 
@@ -55,6 +55,100 @@ pub fn get_asset_data_url(
     Ok(format!("data:{};base64,{}", mime, encoded))
 }
 
+#[tauri::command]
+pub fn list_assets_for_editor(db: State<'_, DbState>) -> Result<Vec<AssetEditorItem>, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let mut stmt = conn
+        .prepare(
+            "WITH usage_base AS (
+                SELECT image_asset_id AS asset_id, hint_type_id, region_id
+                FROM region_hint
+                WHERE image_asset_id IS NOT NULL
+                UNION ALL
+                SELECT icon_asset_id AS asset_id, hint_type_id, region_id
+                FROM region_hint
+                WHERE icon_asset_id IS NOT NULL
+            ),
+            usage_stats AS (
+                SELECT
+                    ub.asset_id AS asset_id,
+                    COUNT(*) AS usage_count,
+                    GROUP_CONCAT(DISTINCT ht.code) AS hint_types,
+                    GROUP_CONCAT(DISTINCT COALESCE(r.country_code, '')) AS country_codes
+                FROM usage_base ub
+                JOIN hint_type ht ON ht.id = ub.hint_type_id
+                JOIN region r ON r.id = ub.region_id
+                GROUP BY ub.asset_id
+            )
+            SELECT
+                a.id,
+                a.file_path,
+                a.kind,
+                a.mime_type,
+                a.width,
+                a.height,
+                a.caption,
+                a.created_at,
+                COALESCE(us.usage_count, 0),
+                COALESCE(us.hint_types, ''),
+                COALESCE(us.country_codes, '')
+            FROM asset a
+            LEFT JOIN usage_stats us ON us.asset_id = a.id
+            ORDER BY a.created_at DESC",
+        )
+        .map_err(|e| e.to_string())?;
+
+    let rows = stmt
+        .query_map([], |row| {
+            let usage_count: i64 = row.get(8)?;
+            let hint_types: String = row.get(9)?;
+            let country_codes: String = row.get(10)?;
+            Ok(AssetEditorItem {
+                id: row.get(0)?,
+                file_path: row.get(1)?,
+                kind: row.get(2)?,
+                mime_type: row.get(3)?,
+                width: row.get(4)?,
+                height: row.get(5)?,
+                caption: row.get(6)?,
+                created_at: row.get(7)?,
+                usage_count: usage_count.clamp(0, i64::from(i32::MAX)) as i32,
+                hint_type_codes: split_csv(hint_types),
+                country_codes: split_csv(country_codes),
+            })
+        })
+        .map_err(|e| e.to_string())?;
+
+    let mut out = Vec::new();
+    for row in rows {
+        out.push(row.map_err(|e| e.to_string())?);
+    }
+
+    Ok(out)
+}
+
+#[tauri::command]
+pub fn replace_asset_bytes(
+    app: tauri::AppHandle,
+    db: State<'_, DbState>,
+    input: ReplaceAssetInput,
+) -> Result<AssetInfo, String> {
+    let app_data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let mut conn = db.conn.lock().map_err(|e| e.to_string())?;
+    service::replace_asset(&mut conn, &app_data_dir, input)
+}
+
+#[tauri::command]
+pub fn crop_asset_image(
+    app: tauri::AppHandle,
+    db: State<'_, DbState>,
+    input: CropAssetInput,
+) -> Result<AssetInfo, String> {
+    let app_data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let mut conn = db.conn.lock().map_err(|e| e.to_string())?;
+    service::crop_asset(&mut conn, &app_data_dir, input)
+}
+
 fn infer_mime_from_file_path(file_path: &str) -> Option<String> {
     let ext = std::path::Path::new(file_path)
         .extension()
@@ -72,6 +166,20 @@ fn infer_mime_from_file_path(file_path: &str) -> Option<String> {
     };
 
     Some(mime.to_string())
+}
+
+fn split_csv(value: String) -> Vec<String> {
+    value
+        .split(',')
+        .filter_map(|raw| {
+            let trimmed = raw.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            }
+        })
+        .collect()
 }
 
 #[cfg(test)]

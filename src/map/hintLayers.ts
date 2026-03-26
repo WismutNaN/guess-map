@@ -1,12 +1,12 @@
 import maplibregl from "maplibre-gl";
 import { refreshDrivingSideLayer } from "./layers/drivingSide";
-import { refreshFlagLayer, setFlagMinConfidence } from "./layers/flags";
+import {
+  isHintGridCode,
+  refreshHintGridType,
+  setHintGridMinConfidence,
+} from "./layers/hintGrid";
 import { refreshNoteLayer, setNoteMinConfidence } from "./layers/note";
 import { refreshRouteLayers, setRoutesMinConfidence } from "./layers/routes";
-import {
-  refreshThematicHintLayer,
-  setThematicHintMinConfidence,
-} from "./layers/thematicHints";
 
 export async function refreshHintTypeOnMap(
   map: maplibregl.Map,
@@ -14,11 +14,6 @@ export async function refreshHintTypeOnMap(
 ) {
   if (hintTypeCode === "driving_side") {
     await refreshDrivingSideLayer(map);
-    return;
-  }
-
-  if (hintTypeCode === "flag") {
-    await refreshFlagLayer(map);
     return;
   }
 
@@ -32,16 +27,19 @@ export async function refreshHintTypeOnMap(
     return;
   }
 
-  const refreshedThematic = await refreshThematicHintLayer(map, hintTypeCode);
-  if (refreshedThematic) {
+  // All other types (flag, sign, bollard, etc.) are managed by the grid
+  if (isHintGridCode(map, hintTypeCode)) {
+    await refreshHintGridType(map, hintTypeCode);
     return;
   }
+
+  // Unknown type — attempt grid refresh anyway (might have been added dynamically)
+  await refreshHintGridType(map, hintTypeCode);
 }
 
 export function applyMinConfidenceFilter(map: maplibregl.Map, minConfidence: number) {
   const normalized = Math.max(0, Math.min(1, minConfidence));
-  setFlagMinConfidence(map, normalized);
+  setHintGridMinConfidence(map, normalized);
   setNoteMinConfidence(map, normalized);
   setRoutesMinConfidence(map, normalized);
-  setThematicHintMinConfidence(map, normalized);
 }

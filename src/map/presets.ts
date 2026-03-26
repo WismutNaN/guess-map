@@ -85,6 +85,7 @@ export const DEFAULT_DENSITY_PRESET: DensityPresetId = "balanced";
 const FLAG_LAYER_ID = "hint-flags";
 const NOTE_LAYER_ID = "hint-notes";
 const THEMATIC_LAYER_PREFIX = "hint-themed-lyr:";
+const HINT_GRID_LAYER_ID = "hint-grid";
 const ROUTE_LABEL_LAYER_ID = "routes-label";
 
 function clampMinZoom(value: number): number {
@@ -140,6 +141,22 @@ export function applyDensityPreset(map: maplibregl.Map, presetId: DensityPresetI
     map.setLayoutProperty(layerId, "text-allow-overlap", textOverlap);
     map.setLayoutProperty(layerId, "text-ignore-placement", textOverlap);
     map.setLayoutProperty(layerId, "text-optional", true);
+  }
+
+  // Unified hint grid layer (replaces both flags + thematic in new system)
+  if (map.getLayer(HINT_GRID_LAYER_ID)) {
+    const minZoom = clampMinZoom(
+      Math.max(preset.overrides.flagMinZoom, 2 + shift)
+    );
+    map.setLayerZoomRange(HINT_GRID_LAYER_ID, minZoom, 10);
+    map.setLayoutProperty(
+      HINT_GRID_LAYER_ID,
+      "icon-allow-overlap",
+      preset.overrides.iconAllowOverlap
+    );
+    map.setLayoutProperty(HINT_GRID_LAYER_ID, "text-allow-overlap", textOverlap);
+    map.setLayoutProperty(HINT_GRID_LAYER_ID, "text-ignore-placement", textOverlap);
+    map.setLayoutProperty(HINT_GRID_LAYER_ID, "text-optional", true);
   }
 
   if (map.getLayer(NOTE_LAYER_ID)) {

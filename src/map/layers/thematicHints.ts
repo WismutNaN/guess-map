@@ -3,38 +3,59 @@ import maplibregl from "maplibre-gl";
 import type { HintTypeInfo } from "../../types";
 import { registerLayerGroup } from "../layerManager";
 import { applySlotLayout, makeCenteredGridOffsets, setSlotLayers } from "./slots";
+import {
+  colorForHintCode,
+  createHintImageCard,
+  createHintTextCard,
+  setHintCardImage,
+} from "./hintCards";
 
 const SOURCE_ID_PREFIX = "hint-themed-src:";
 const LAYER_ID_PREFIX = "hint-themed-lyr:";
-const IMAGE_ID_PREFIX = "hint-themed-image:v3:";
+const IMAGE_ID_PREFIX = "hint-themed-card:v4:";
 const IMAGE_ID_PROPERTY = "icon_image_id";
 const LOCAL_SLOT_KEY_PROPERTY = "gm_local_slot_key";
 const SLOT_LAYER_SEPARATOR = ":slot:";
 
-const THEMATIC_DISPLAY_FAMILIES = new Set<string>(["image", "icon"]);
-const EXCLUDED_HINT_CODES = new Set<string>(["flag"]);
+const THEMATIC_DISPLAY_FAMILIES = new Set<string>(["image", "icon", "text"]);
+const EXCLUDED_HINT_CODES = new Set<string>(["flag", "note"]);
 
 const mapsWithImageMissingHandler = new WeakSet<maplibregl.Map>();
 const imageLoadsInFlight = new Map<string, Promise<void>>();
 const stateByMap = new WeakMap<maplibregl.Map, ThematicHintLayerState>();
+const thematicCardDescriptors = new Map<string, ThematicCardDescriptor>();
 
 export const DEFAULT_THEMATIC_HINT_SIZE_SCALE = 1.2;
 
 const MIN_THEMATIC_HINT_SIZE_SCALE = 0.6;
 const MAX_THEMATIC_HINT_SIZE_SCALE = 3.0;
 const THEME_BASE_SIZES = {
-  zoom2: 0.22,
-  zoom4: 0.28,
-  zoom7: 0.34,
+  zoom2: 0.12,
+  zoom4: 0.2,
+  zoom6: 0.32,
+  zoom8: 0.44,
 } as const;
-const THEMATIC_THUMBNAIL_MAX_WIDTH = 320;
-const THEMATIC_THUMBNAIL_MAX_HEIGHT = 200;
-const THEMATIC_LOCAL_SPACING_BASE = Math.round(THEMATIC_THUMBNAIL_MAX_WIDTH * 0.92);
-const THEMATIC_LOCAL_SPACING_MIN = 220;
-const THEMATIC_LOCAL_SPACING_MAX = 420;
+const THEMATIC_CARD_WIDTH = 240;
+const THEMATIC_LOCAL_SPACING_BASE = Math.round(THEMATIC_CARD_WIDTH * 0.88);
+const THEMATIC_LOCAL_SPACING_MIN = 120;
+const THEMATIC_LOCAL_SPACING_MAX = 340;
+const REGION_LEVEL_SIZE_FACTOR = [
+  "match",
+  ["coalesce", ["get", "region_level"], "country"],
+  "country",
+  1,
+  "theme_region",
+  0.9,
+  "admin1",
+  0.82,
+  "admin2",
+  0.72,
+  1,
+] as maplibregl.ExpressionSpecification;
 
 type ThematicFeatureProperties = GeoJSON.GeoJsonProperties & {
   region_id?: string;
+  region_level?: string;
   short_value?: string;
   full_value?: string;
   color?: string;
@@ -58,7 +79,19 @@ interface LocalSlotDefinition {
   key: string;
   offset: [number, number];
   layerId: string;
+  rank: number;
 }
+
+type ThematicCardDescriptor = {
+  imageId: string;
+  kind: "asset" | "text";
+  hintCode: string;
+  hintTitle: string;
+  accentColor: string;
+  assetId?: string;
+  text?: string;
+  subtitle?: string;
+};
 
 function normalizeText(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -94,13 +127,40 @@ function slotLayerIdForHint(code: string, key: string): string {
   return `${slotLayerPrefixForHint(code)}${sanitizeSlotKey(key)}`;
 }
 
-function imageIdForAsset(assetId: string): string {
-  return `${IMAGE_ID_PREFIX}${assetId}`;
+function hashString(value: string): number {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i += 1) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
 }
 
-function assetIdFromImageId(imageId: string): string | null {
-  if (!imageId.startsWith(IMAGE_ID_PREFIX)) return null;
-  return normalizeText(imageId.slice(IMAGE_ID_PREFIX.length));
+function truncateText(value: string, maxLength: number): string {
+  if (value.length <= maxLength) {
+    return value;
+  }
+  return `${value.slice(0, Math.max(1, maxLength - 1)).trimEnd()}…`;
+}
+
+function imageIdForAsset(hintCode: string, assetId: string): string {
+  return `${IMAGE_ID_PREFIX}asset:${hintCode}:${assetId}`;
+}
+
+function imageIdForTextCard(hintCode: string, text: string): string {
+  return `${IMAGE_ID_PREFIX}text:${hintCode}:${hashString(text).toString(16)}`;
+}
+
+function registerThematicCardDescriptor(descriptor: ThematicCardDescriptor) {
+  const existing = thematicCardDescriptors.get(descriptor.imageId);
+  if (!existing) {
+    thematicCardDescriptors.set(descriptor.imageId, descriptor);
+    return;
+  }
+
+  if (!existing.subtitle && descriptor.subtitle) {
+    existing.subtitle = descriptor.subtitle;
+  }
 }
 
 function clampHintSizeScale(value: number): number {
@@ -118,11 +178,13 @@ function buildHintSizeExpression(scale: number): maplibregl.ExpressionSpecificat
     ["linear"],
     ["zoom"],
     2,
-    THEME_BASE_SIZES.zoom2 * clamped,
+    ["*", THEME_BASE_SIZES.zoom2 * clamped, REGION_LEVEL_SIZE_FACTOR],
     4,
-    THEME_BASE_SIZES.zoom4 * clamped,
-    7,
-    THEME_BASE_SIZES.zoom7 * clamped,
+    ["*", THEME_BASE_SIZES.zoom4 * clamped, REGION_LEVEL_SIZE_FACTOR],
+    6,
+    ["*", THEME_BASE_SIZES.zoom6 * clamped, REGION_LEVEL_SIZE_FACTOR],
+    8,
+    ["*", THEME_BASE_SIZES.zoom8 * clamped, REGION_LEVEL_SIZE_FACTOR],
   ] as maplibregl.ExpressionSpecification;
 }
 
@@ -144,16 +206,81 @@ function chooseFeatureAssetId(props: ThematicFeatureProperties): string | null {
   return normalizeText(props.icon_asset_id) ?? normalizeText(props.image_asset_id);
 }
 
-function applyIconImageIds(data: ThematicFeatureCollection): string[] {
-  const assetIds = new Set<string>();
+function chooseFeatureText(props: ThematicFeatureProperties): string | null {
+  const direct =
+    normalizeText(props.short_value) ?? normalizeText(props.full_value);
+  if (direct) {
+    return direct;
+  }
+
+  const fallbackKeys = [
+    "prefix",
+    "format",
+    "generation",
+    "script_name",
+    "route_number",
+    "brand",
+    "model",
+    "biome",
+    "material",
+    "sign_type",
+  ];
+
+  for (const key of fallbackKeys) {
+    const raw = (props as Record<string, unknown>)[key];
+    if (typeof raw === "string") {
+      const value = normalizeText(raw);
+      if (value) {
+        return value;
+      }
+    } else if (typeof raw === "number" && Number.isFinite(raw)) {
+      return String(raw);
+    }
+  }
+
+  return null;
+}
+
+function applyIconImageIds(
+  data: ThematicFeatureCollection,
+  hintType: HintTypeInfo
+): string[] {
+  const imageIds = new Set<string>();
+  const accentColor = colorForHintCode(hintType.code);
+  const tag = truncateText(hintType.title, 28);
 
   for (const feature of data.features) {
     const props: ThematicFeatureProperties = feature.properties ?? {};
     const assetId = chooseFeatureAssetId(props);
+    const textValue = chooseFeatureText(props);
+    let imageId: string | null = null;
 
     if (assetId) {
-      props[IMAGE_ID_PROPERTY] = imageIdForAsset(assetId);
-      assetIds.add(assetId);
+      imageId = imageIdForAsset(hintType.code, assetId);
+      registerThematicCardDescriptor({
+        imageId,
+        kind: "asset",
+        hintCode: hintType.code,
+        hintTitle: tag,
+        accentColor,
+        assetId,
+        subtitle: textValue ? truncateText(textValue, 26) : undefined,
+      });
+    } else if (textValue) {
+      imageId = imageIdForTextCard(hintType.code, textValue);
+      registerThematicCardDescriptor({
+        imageId,
+        kind: "text",
+        hintCode: hintType.code,
+        hintTitle: tag,
+        accentColor,
+        text: truncateText(textValue, 64),
+      });
+    }
+
+    if (imageId) {
+      props[IMAGE_ID_PROPERTY] = imageId;
+      imageIds.add(imageId);
     } else {
       delete props[IMAGE_ID_PROPERTY];
     }
@@ -161,7 +288,7 @@ function applyIconImageIds(data: ThematicFeatureCollection): string[] {
     feature.properties = props;
   }
 
-  return [...assetIds];
+  return [...imageIds];
 }
 
 function getFeatureGroupingKey(
@@ -190,14 +317,36 @@ function buildLocalSlotKey(offset: [number, number]): string {
   return `${offset[0]},${offset[1]}`;
 }
 
-function computeAdaptiveLocalSpacing(count: number): number {
+function regionLevelSpacingFactor(regionLevel: string | null): number {
+  switch (regionLevel) {
+    case "admin2":
+      return 0.72;
+    case "admin1":
+      return 0.82;
+    case "theme_region":
+      return 0.9;
+    case "country":
+    default:
+      return 1;
+  }
+}
+
+function computeAdaptiveLocalSpacing(count: number, regionLevel: string | null): number {
   const featureCount = Math.max(1, count);
   const columns = Math.ceil(Math.sqrt(featureCount));
   const densityFactor = 1 + Math.max(0, columns - 1) * 0.22;
-  const spacing = THEMATIC_LOCAL_SPACING_BASE * densityFactor;
+  const regionFactor = regionLevelSpacingFactor(regionLevel);
+  const spacing = THEMATIC_LOCAL_SPACING_BASE * densityFactor * regionFactor;
   return Number(
     Math.max(THEMATIC_LOCAL_SPACING_MIN, Math.min(THEMATIC_LOCAL_SPACING_MAX, spacing)).toFixed(2)
   );
+}
+
+function slotMinZoomForRank(rank: number): number {
+  if (rank <= 0) return 2;
+  if (rank <= 2) return 4.2;
+  if (rank <= 5) return 5.8;
+  return 7;
 }
 
 function applyLocalSlotKeys(data: ThematicFeatureCollection): LocalSlotDefinition[] {
@@ -206,6 +355,7 @@ function applyLocalSlotKeys(data: ThematicFeatureCollection): LocalSlotDefinitio
     Array<GeoJSON.Feature<GeoJSON.Geometry, ThematicFeatureProperties>>
   >();
   const offsetsByKey = new Map<string, [number, number]>();
+  const rankByKey = new Map<string, number>();
 
   for (let i = 0; i < data.features.length; i += 1) {
     const feature = data.features[i];
@@ -219,23 +369,37 @@ function applyLocalSlotKeys(data: ThematicFeatureCollection): LocalSlotDefinitio
   }
 
   for (const groupFeatures of groups.values()) {
-    const spacing = computeAdaptiveLocalSpacing(groupFeatures.length);
-    const offsets = makeCenteredGridOffsets(groupFeatures.length, spacing);
+    const regionLevel = normalizeText(groupFeatures[0]?.properties?.region_level);
+    const spacing = computeAdaptiveLocalSpacing(groupFeatures.length, regionLevel);
+    const offsets = makeCenteredGridOffsets(groupFeatures.length, spacing)
+      .map((offset) => ({
+        offset,
+        distance: Math.hypot(offset[0], offset[1]),
+      }))
+      .sort((a, b) => a.distance - b.distance);
 
     for (let i = 0; i < groupFeatures.length; i += 1) {
       const feature = groupFeatures[i];
       const props: ThematicFeatureProperties = feature.properties ?? {};
-      const offset = offsets[i] ?? [0, 0];
+      const offset = offsets[i]?.offset ?? [0, 0];
       const slotKey = buildLocalSlotKey(offset);
       props[LOCAL_SLOT_KEY_PROPERTY] = slotKey;
       feature.properties = props;
       offsetsByKey.set(slotKey, offset);
+      const existingRank = rankByKey.get(slotKey);
+      if (existingRank === undefined || i < existingRank) {
+        rankByKey.set(slotKey, i);
+      }
     }
   }
 
   return [...offsetsByKey.entries()]
-    .map(([key, offset]) => ({ key, offset }))
-    .sort((a, b) => a.offset[1] - b.offset[1] || a.offset[0] - b.offset[0])
+    .map(([key, offset]) => ({
+      key,
+      offset,
+      rank: rankByKey.get(key) ?? 0,
+    }))
+    .sort((a, b) => a.rank - b.rank || a.offset[1] - b.offset[1] || a.offset[0] - b.offset[0])
     .map((entry) => ({
       ...entry,
       layerId: "",
@@ -268,14 +432,15 @@ function upsertSlotLayer(
   map: maplibregl.Map,
   sourceId: string,
   layerId: string,
-  localSlotKey: string
+  localSlotKey: string,
+  minzoom: number
 ) {
   if (!map.getLayer(layerId)) {
     map.addLayer({
       id: layerId,
       type: "symbol",
       source: sourceId,
-      minzoom: 2,
+      minzoom,
       maxzoom: 9,
       metadata: {
         [LOCAL_SLOT_KEY_PROPERTY]: localSlotKey,
@@ -285,8 +450,9 @@ function upsertSlotLayer(
         "icon-image": ["get", IMAGE_ID_PROPERTY],
         "icon-size": buildHintSizeExpression(DEFAULT_THEMATIC_HINT_SIZE_SCALE),
         "icon-anchor": "center",
-        "icon-allow-overlap": true,
-        "icon-ignore-placement": true,
+        "icon-allow-overlap": false,
+        "icon-ignore-placement": false,
+        "icon-padding": 6,
         "icon-optional": true,
         "text-field": [
           "case",
@@ -319,6 +485,7 @@ function upsertSlotLayer(
     });
   } else {
     map.setFilter(layerId, makeSlotFilter(localSlotKey));
+    map.setLayerZoomRange(layerId, minzoom, 9);
   }
 }
 
@@ -342,7 +509,7 @@ function syncSlotLayers(
   }
 
   for (const slot of withLayerIds) {
-    upsertSlotLayer(map, sourceId, slot.layerId, slot.key);
+    upsertSlotLayer(map, sourceId, slot.layerId, slot.key, slotMinZoomForRank(slot.rank));
   }
 
   return withLayerIds;
@@ -357,40 +524,13 @@ async function loadImageElement(src: string): Promise<HTMLImageElement> {
   });
 }
 
-function createThumbnailImageData(
-  source: HTMLImageElement,
-  maxWidth: number,
-  maxHeight: number
-): ImageData | HTMLImageElement {
-  const naturalWidth = source.naturalWidth || source.width;
-  const naturalHeight = source.naturalHeight || source.height;
-
-  if (naturalWidth <= 0 || naturalHeight <= 0) {
-    return source;
-  }
-
-  const scale = Math.min(1, maxWidth / naturalWidth, maxHeight / naturalHeight);
-  if (scale >= 0.999) {
-    return source;
-  }
-
-  const width = Math.max(1, Math.round(naturalWidth * scale));
-  const height = Math.max(1, Math.round(naturalHeight * scale));
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) {
-    return source;
-  }
-
-  ctx.drawImage(source, 0, 0, width, height);
-  return ctx.getImageData(0, 0, width, height);
-}
-
-async function ensureThematicImage(map: maplibregl.Map, assetId: string): Promise<void> {
-  const imageId = imageIdForAsset(assetId);
+async function ensureThematicImage(map: maplibregl.Map, imageId: string): Promise<void> {
   if (map.hasImage(imageId)) {
+    return;
+  }
+
+  const descriptor = thematicCardDescriptors.get(imageId);
+  if (!descriptor) {
     return;
   }
 
@@ -400,19 +540,29 @@ async function ensureThematicImage(map: maplibregl.Map, assetId: string): Promis
   }
 
   const loadPromise = (async () => {
-    const dataUrl = await invoke<string>("get_asset_data_url", { assetId });
-    const image = await loadImageElement(dataUrl);
-    const thumbnail = createThumbnailImageData(
-      image,
-      THEMATIC_THUMBNAIL_MAX_WIDTH,
-      THEMATIC_THUMBNAIL_MAX_HEIGHT
-    );
-    if (!map.hasImage(imageId)) {
-      map.addImage(imageId, thumbnail);
+    if (descriptor.kind === "asset") {
+      const dataUrl = await invoke<string>("get_asset_data_url", {
+        assetId: descriptor.assetId,
+      });
+      const image = await loadImageElement(dataUrl);
+      const imageForMap = createHintImageCard(image, {
+        hintCode: descriptor.hintCode,
+        tag: descriptor.hintTitle,
+        subtitle: descriptor.subtitle,
+      });
+      setHintCardImage(map, imageId, imageForMap);
+      return;
     }
+
+    const textCard = createHintTextCard({
+      hintCode: descriptor.hintCode,
+      tag: descriptor.hintTitle,
+      text: descriptor.text ?? "",
+    });
+    setHintCardImage(map, imageId, textCard);
   })()
     .catch((error) => {
-      console.warn(`Failed to load themed icon for asset ${assetId}:`, error);
+      console.warn(`Failed to load themed card image ${imageId}:`, error);
     })
     .finally(() => {
       imageLoadsInFlight.delete(imageId);
@@ -430,30 +580,27 @@ function bindStyleImageMissingHandler(map: maplibregl.Map) {
   map.on("styleimagemissing", (event) => {
     const imageId = normalizeText((event as { id?: unknown }).id);
     if (!imageId) return;
-
-    const assetId = assetIdFromImageId(imageId);
-    if (!assetId) return;
-
-    void ensureThematicImage(map, assetId);
+    if (!imageId.startsWith(IMAGE_ID_PREFIX)) return;
+    void ensureThematicImage(map, imageId);
   });
 
   mapsWithImageMissingHandler.add(map);
 }
 
-function preloadThematicImages(map: maplibregl.Map, assetIds: string[]) {
-  for (const assetId of assetIds) {
-    void ensureThematicImage(map, assetId);
+function preloadThematicImages(map: maplibregl.Map, imageIds: string[]) {
+  for (const imageId of imageIds) {
+    void ensureThematicImage(map, imageId);
   }
 }
 
 async function upsertHintLayer(map: maplibregl.Map, hintType: HintTypeInfo) {
   const sourceId = sourceIdForHint(hintType.code);
   const data = await loadHintGeoJson(hintType.code);
-  const assetIds = applyIconImageIds(data);
+  const imageIds = applyIconImageIds(data, hintType);
   const localSlots = applyLocalSlotKeys(data);
 
   bindStyleImageMissingHandler(map);
-  preloadThematicImages(map, assetIds);
+  preloadThematicImages(map, imageIds);
 
   const source = map.getSource(sourceId) as maplibregl.GeoJSONSource | undefined;
   if (!source) {

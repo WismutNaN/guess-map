@@ -1,4 +1,4 @@
-export type AppMode = "study" | "editor";
+export type AppMode = "study" | "editor" | "assets";
 
 export interface RegionInfo {
   id: string;
@@ -49,6 +49,20 @@ export interface AssetInfo {
   width?: number | null;
   height?: number | null;
   caption?: string | null;
+}
+
+export interface AssetEditorItem {
+  id: string;
+  file_path: string;
+  kind: string;
+  mime_type?: string | null;
+  width?: number | null;
+  height?: number | null;
+  caption?: string | null;
+  created_at: string;
+  usage_count: number;
+  hint_type_codes: string[];
+  country_codes: string[];
 }
 
 export interface BatchMutationResult {

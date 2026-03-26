@@ -11,6 +11,7 @@ import { ChangeLog } from "./components/ChangeLog";
 import { DebugPanel } from "./components/DebugPanel";
 import { LayerPanel } from "./components/LayerPanel";
 import { MapView } from "./components/MapView";
+import { AssetLibrary } from "./components/AssetLibrary";
 import { RegionInspector } from "./components/RegionInspector";
 import { Settings } from "./components/Settings";
 import { StatusBar } from "./components/StatusBar";
@@ -46,8 +47,16 @@ function App() {
 
   // Sync routes filter when selected country changes
   useEffect(() => {
+    if (mode === "assets") return;
     layers.syncRoutesFilter(selection.selectedCountryCode);
-  }, [layers, selection.selectedCountryCode]);
+  }, [layers.syncRoutesFilter, mode, selection.selectedCountryCode]);
+
+  // Clear map refs while map view is hidden.
+  useEffect(() => {
+    if (mode !== "assets") return;
+    mapRef.current = null;
+    layers.clearMap();
+  }, [layers.clearMap, mode]);
 
   // Handle map ready
   const handleMapReady = useCallback(
@@ -104,7 +113,7 @@ function App() {
     });
 
     return () => unlisten?.();
-  }, [layers]);
+  }, [layers.onHintChanged]);
 
   return (
     <div className="app">
@@ -121,38 +130,46 @@ function App() {
       />
 
       <div className="map-wrapper">
-        <MapView
-          editorMode={mode === "editor"}
-          selectedRegions={selection.regions}
-          onSelectionChange={selection.setSelection}
-          onZoomChange={setZoom}
-          onMapReady={handleMapReady}
-        />
+        {mode === "assets" ? (
+          <AssetLibrary />
+        ) : (
+          <MapView
+            editorMode={mode === "editor"}
+            selectedRegions={selection.regions}
+            onSelectionChange={selection.setSelection}
+            onZoomChange={setZoom}
+            onMapReady={handleMapReady}
+          />
+        )}
       </div>
 
-      <LayerPanel
-        onToggle={layers.toggleLayer}
-        refreshSignal={layers.refreshSignal}
-        coverageOpacity={layers.coverageOpacity}
-        onCoverageOpacityChange={layers.setCoverageOpacity}
-        flagSizeScale={layers.flagSizeScale}
-        onFlagSizeScaleChange={layers.setFlagSizeScale}
-        minConfidence={layers.minConfidence}
-        onMinConfidenceChange={layers.setMinConfidence}
-        emptyFilterHintType={layers.emptyFilterHintType}
-        onEmptyFilterHintTypeChange={layers.setEmptyFilterHintType}
-        showEmptyRegions={layers.showEmptyRegions}
-        onShowEmptyRegionsChange={layers.setShowEmptyRegions}
-        selectedCountryCode={selection.selectedCountryCode}
-        routesFilterMode={layers.routesFilterMode}
-        onRoutesFilterModeChange={layers.setRoutesFilterMode}
-      />
-      <DebugPanel
-        showCollisionBoxes={layers.showCollisionBoxes}
-        showTileBoundaries={layers.showTileBoundaries}
-        onShowCollisionBoxesChange={layers.setShowCollisionBoxes}
-        onShowTileBoundariesChange={layers.setShowTileBoundaries}
-      />
+      {mode !== "assets" && (
+        <>
+          <LayerPanel
+            onToggle={layers.toggleLayer}
+            refreshSignal={layers.refreshSignal}
+            coverageOpacity={layers.coverageOpacity}
+            onCoverageOpacityChange={layers.setCoverageOpacity}
+            flagSizeScale={layers.flagSizeScale}
+            onFlagSizeScaleChange={layers.setFlagSizeScale}
+            minConfidence={layers.minConfidence}
+            onMinConfidenceChange={layers.setMinConfidence}
+            emptyFilterHintType={layers.emptyFilterHintType}
+            onEmptyFilterHintTypeChange={layers.setEmptyFilterHintType}
+            showEmptyRegions={layers.showEmptyRegions}
+            onShowEmptyRegionsChange={layers.setShowEmptyRegions}
+            selectedCountryCode={selection.selectedCountryCode}
+            routesFilterMode={layers.routesFilterMode}
+            onRoutesFilterModeChange={layers.setRoutesFilterMode}
+          />
+          <DebugPanel
+            showCollisionBoxes={layers.showCollisionBoxes}
+            showTileBoundaries={layers.showTileBoundaries}
+            onShowCollisionBoxesChange={layers.setShowCollisionBoxes}
+            onShowTileBoundariesChange={layers.setShowTileBoundaries}
+          />
+        </>
+      )}
 
       {mode === "editor" && (
         <RegionInspector
@@ -171,11 +188,13 @@ function App() {
         />
       )}
 
-      <ChangeLog
-        open={changeLogOpen}
-        onClose={() => setChangeLogOpen(false)}
-        refreshSignal={layers.revisionSignal}
-      />
+      {mode !== "assets" && (
+        <ChangeLog
+          open={changeLogOpen}
+          onClose={() => setChangeLogOpen(false)}
+          refreshSignal={layers.revisionSignal}
+        />
+      )}
 
       <Settings open={settingsOpen} onClose={() => setSettingsOpen(false)} />
 

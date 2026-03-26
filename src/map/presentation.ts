@@ -21,6 +21,7 @@ export const DEFAULT_PRESENTATION_MODE: PresentationMode = "icons_text";
 const FLAG_LAYER_ID = "hint-flags";
 const NOTE_LAYER_ID = "hint-notes";
 const THEMATIC_LAYER_PREFIX = "hint-themed-lyr:";
+const HINT_GRID_LAYER_ID = "hint-grid";
 
 const EMPTY_TEXT_FIELD = ["literal", ""] as maplibregl.ExpressionSpecification;
 
@@ -83,6 +84,11 @@ export function applyPresentationMode(
       continue;
     }
     map.setLayoutProperty(layerId, "text-field", textFieldForMode);
+  }
+
+  // Unified hint grid
+  if (map.getLayer(HINT_GRID_LAYER_ID)) {
+    map.setLayoutProperty(HINT_GRID_LAYER_ID, "text-field", textFieldForMode);
   }
 
   if (map.getLayer(NOTE_LAYER_ID)) {

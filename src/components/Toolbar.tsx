@@ -49,8 +49,19 @@ export function Toolbar({
         >
           Editor
         </button>
+        <button
+          type="button"
+          className={mode === "assets" ? "active" : ""}
+          onClick={() => onModeChange("assets")}
+        >
+          Assets
+        </button>
       </div>
-      <SearchBar onSelect={onRegionSelect} />
+      {mode === "assets" ? (
+        <div className="toolbar-assets-label">Asset Library Mode</div>
+      ) : (
+        <SearchBar onSelect={onRegionSelect} />
+      )}
       <div className="toolbar-display-controls">
         <label className="toolbar-select-wrap">
           <span>Density</span>

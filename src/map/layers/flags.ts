@@ -2,31 +2,49 @@ import maplibregl from "maplibre-gl";
 import { invoke } from "@tauri-apps/api/core";
 import { registerLayerGroup } from "../layerManager";
 import { applySlotLayout, setSlotLayers } from "./slots";
+import { createHintImageCard, setHintCardImage } from "./hintCards";
 
 const SOURCE_ID = "hint-flags";
 const LAYER_ID = "hint-flags";
-const IMAGE_ID_PREFIX = "flag-icon:";
+const IMAGE_ID_PREFIX = "flag-card:v3:";
 const IMAGE_ID_PROPERTY = "icon_image_id";
 export const DEFAULT_FLAG_SIZE_SCALE = 1.75;
 const MIN_FLAG_SIZE_SCALE = 0.5;
 const MAX_FLAG_SIZE_SCALE = 3.0;
-const FLAG_BASE_SIZES = {
-  zoom2: 0.07,
-  zoom4: 0.1,
-  zoom7: 0.14,
-} as const;
 
 type FlagProperties = GeoJSON.GeoJsonProperties & {
   icon_asset_id?: string;
   icon_image_id?: string;
   short_value?: string;
   country_code?: string;
+  region_level?: string;
 };
+
+const REGION_LEVEL_SIZE_FACTOR = [
+  "match",
+  ["coalesce", ["get", "region_level"], "country"],
+  "country",
+  1,
+  "theme_region",
+  0.9,
+  "admin1",
+  0.82,
+  "admin2",
+  0.72,
+  1,
+] as maplibregl.ExpressionSpecification;
 
 type FlagFeatureCollection = GeoJSON.FeatureCollection<GeoJSON.Geometry, FlagProperties>;
 
 const mapsWithMissingImageHandler = new WeakSet<maplibregl.Map>();
 const flagImageLoadsInFlight = new Map<string, Promise<void>>();
+const flagCardDescriptors = new Map<string, FlagCardDescriptor>();
+
+interface FlagCardDescriptor {
+  imageId: string;
+  assetId: string;
+  subtitle: string | null;
+}
 
 function normalizeText(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -46,11 +64,13 @@ function buildIconSizeExpression(scale: number): maplibregl.ExpressionSpecificat
     ["linear"],
     ["zoom"],
     2,
-    FLAG_BASE_SIZES.zoom2 * clamped,
+    ["*", 0.058 * clamped, REGION_LEVEL_SIZE_FACTOR],
     4,
-    FLAG_BASE_SIZES.zoom4 * clamped,
-    7,
-    FLAG_BASE_SIZES.zoom7 * clamped,
+    ["*", 0.1 * clamped, REGION_LEVEL_SIZE_FACTOR],
+    6,
+    ["*", 0.15 * clamped, REGION_LEVEL_SIZE_FACTOR],
+    8,
+    ["*", 0.22 * clamped, REGION_LEVEL_SIZE_FACTOR],
   ] as maplibregl.ExpressionSpecification;
 }
 
@@ -58,9 +78,15 @@ function imageIdForAsset(assetId: string): string {
   return `${IMAGE_ID_PREFIX}${assetId}`;
 }
 
-function assetIdFromImageId(imageId: string): string | null {
-  if (!imageId.startsWith(IMAGE_ID_PREFIX)) return null;
-  return normalizeText(imageId.slice(IMAGE_ID_PREFIX.length));
+function registerFlagDescriptor(descriptor: FlagCardDescriptor) {
+  const existing = flagCardDescriptors.get(descriptor.imageId);
+  if (!existing) {
+    flagCardDescriptors.set(descriptor.imageId, descriptor);
+    return;
+  }
+  if (!existing.subtitle && descriptor.subtitle) {
+    existing.subtitle = descriptor.subtitle;
+  }
 }
 
 function applyIconImageIds(data: FlagFeatureCollection): string[] {
@@ -70,7 +96,13 @@ function applyIconImageIds(data: FlagFeatureCollection): string[] {
     const props: FlagProperties = feature.properties ?? {};
     const iconAssetId = normalizeText(props.icon_asset_id);
     if (iconAssetId) {
-      props[IMAGE_ID_PROPERTY] = imageIdForAsset(iconAssetId);
+      const imageId = imageIdForAsset(iconAssetId);
+      props[IMAGE_ID_PROPERTY] = imageId;
+      registerFlagDescriptor({
+        imageId,
+        assetId: iconAssetId,
+        subtitle: normalizeText(props.country_code) ?? normalizeText(props.short_value),
+      });
       ids.add(iconAssetId);
     } else {
       delete props[IMAGE_ID_PROPERTY];
@@ -90,9 +122,13 @@ async function loadImageElement(src: string): Promise<HTMLImageElement> {
   });
 }
 
-async function ensureFlagImage(map: maplibregl.Map, assetId: string): Promise<void> {
-  const imageId = imageIdForAsset(assetId);
+async function ensureFlagImage(map: maplibregl.Map, imageId: string): Promise<void> {
   if (map.hasImage(imageId)) {
+    return;
+  }
+
+  const descriptor = flagCardDescriptors.get(imageId);
+  if (!descriptor) {
     return;
   }
 
@@ -102,14 +138,22 @@ async function ensureFlagImage(map: maplibregl.Map, assetId: string): Promise<vo
   }
 
   const loadPromise = (async () => {
-    const dataUrl = await invoke<string>("get_asset_data_url", { assetId });
+    const dataUrl = await invoke<string>("get_asset_data_url", {
+      assetId: descriptor.assetId,
+    });
     const image = await loadImageElement(dataUrl);
-    if (!map.hasImage(imageId)) {
-      map.addImage(imageId, image);
-    }
+    const card = createHintImageCard(image, {
+      hintCode: "flag",
+      tag: "Flag",
+      subtitle: descriptor.subtitle,
+    });
+    setHintCardImage(map, imageId, card);
   })()
     .catch((error) => {
-      console.warn(`Failed to load flag icon for asset ${assetId}:`, error);
+      console.warn(
+        `Failed to load flag card icon ${imageId} (asset ${descriptor.assetId}):`,
+        error
+      );
     })
     .finally(() => {
       flagImageLoadsInFlight.delete(imageId);
@@ -128,10 +172,9 @@ function bindStyleImageMissingHandler(map: maplibregl.Map) {
     const imageId = normalizeText((event as { id?: unknown }).id);
     if (!imageId) return;
 
-    const assetId = assetIdFromImageId(imageId);
-    if (!assetId) return;
+    if (!imageId.startsWith(IMAGE_ID_PREFIX)) return;
 
-    void ensureFlagImage(map, assetId);
+    void ensureFlagImage(map, imageId);
   });
 
   mapsWithMissingImageHandler.add(map);
@@ -139,7 +182,7 @@ function bindStyleImageMissingHandler(map: maplibregl.Map) {
 
 function preloadFlagImages(map: maplibregl.Map, assetIds: string[]) {
   for (const assetId of assetIds) {
-    void ensureFlagImage(map, assetId);
+    void ensureFlagImage(map, imageIdForAsset(assetId));
   }
 }
 
@@ -172,6 +215,8 @@ export async function addFlagLayer(map: maplibregl.Map) {
         "icon-image": ["get", IMAGE_ID_PROPERTY],
         "icon-size": buildIconSizeExpression(DEFAULT_FLAG_SIZE_SCALE),
         "icon-allow-overlap": false,
+        "icon-ignore-placement": false,
+        "icon-padding": 4,
         "icon-optional": true,
         "text-field": [
           "case",
