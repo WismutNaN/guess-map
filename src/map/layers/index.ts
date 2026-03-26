@@ -5,5 +5,6 @@ export { addCoverageLayer } from "./coverage";
 export { addDrivingSideLayer } from "./drivingSide";
 export { addFlagLayer } from "./flags";
 export { addNoteLayer } from "./note";
+export { addThematicHintLayers } from "./thematicHints";
 export { addRouteLayers } from "./routes";
 export { addSelectionLayers, setSelectedRegions } from "./selection";

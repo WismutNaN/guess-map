@@ -181,13 +181,13 @@ export function LayerPanel({
 
           <div className="overlay-slider-block">
             <div className="overlay-slider-label">
-              Flag size
+              Symbol size
               <span>{flagSizeLocal}%</span>
             </div>
             <input
               className="overlay-slider"
               type="range"
-              aria-label="Flag size"
+              aria-label="Symbol size"
               min={100}
               max={300}
               step={5}

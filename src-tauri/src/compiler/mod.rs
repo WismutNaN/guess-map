@@ -12,7 +12,7 @@ pub fn compile_point_layer(conn: &Connection, hint_type_code: &str) -> Result<St
             "SELECT rh.id, rh.short_value, rh.full_value, rh.data_json, rh.color,
                     rh.min_zoom, rh.max_zoom, rh.confidence,
                     r.anchor_lng, r.anchor_lat, r.name, r.country_code, r.id as region_id,
-                    rh.icon_asset_id
+                    rh.image_asset_id, rh.icon_asset_id, rh.source_note
              FROM region_hint rh
              JOIN region r ON rh.region_id = r.id
              JOIN hint_type ht ON rh.hint_type_id = ht.id
@@ -35,7 +35,9 @@ pub fn compile_point_layer(conn: &Connection, hint_type_code: &str) -> Result<St
             let region_name: String = row.get(10)?;
             let country_code: Option<String> = row.get(11)?;
             let region_id: String = row.get(12)?;
-            let icon_asset_id: Option<String> = row.get(13)?;
+            let image_asset_id: Option<String> = row.get(13)?;
+            let icon_asset_id: Option<String> = row.get(14)?;
+            let source_note: Option<String> = row.get(15)?;
 
             let mut properties = serde_json::Map::new();
             properties.insert("id".into(), json!(id));
@@ -48,7 +50,9 @@ pub fn compile_point_layer(conn: &Connection, hint_type_code: &str) -> Result<St
             properties.insert("min_zoom".into(), json!(min_zoom));
             properties.insert("max_zoom".into(), json!(max_zoom));
             properties.insert("confidence".into(), json!(confidence));
+            properties.insert("image_asset_id".into(), json!(image_asset_id));
             properties.insert("icon_asset_id".into(), json!(icon_asset_id));
+            properties.insert("source_note".into(), json!(source_note));
 
             // Flatten data_json into properties
             if let Some(dj) = data_json {

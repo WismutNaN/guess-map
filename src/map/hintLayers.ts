@@ -3,6 +3,10 @@ import { refreshDrivingSideLayer } from "./layers/drivingSide";
 import { refreshFlagLayer, setFlagMinConfidence } from "./layers/flags";
 import { refreshNoteLayer, setNoteMinConfidence } from "./layers/note";
 import { refreshRouteLayers, setRoutesMinConfidence } from "./layers/routes";
+import {
+  refreshThematicHintLayer,
+  setThematicHintMinConfidence,
+} from "./layers/thematicHints";
 
 export async function refreshHintTypeOnMap(
   map: maplibregl.Map,
@@ -25,6 +29,12 @@ export async function refreshHintTypeOnMap(
 
   if (hintTypeCode === "highway") {
     await refreshRouteLayers(map);
+    return;
+  }
+
+  const refreshedThematic = await refreshThematicHintLayer(map, hintTypeCode);
+  if (refreshedThematic) {
+    return;
   }
 }
 
@@ -33,4 +43,5 @@ export function applyMinConfidenceFilter(map: maplibregl.Map, minConfidence: num
   setFlagMinConfidence(map, normalized);
   setNoteMinConfidence(map, normalized);
   setRoutesMinConfidence(map, normalized);
+  setThematicHintMinConfidence(map, normalized);
 }

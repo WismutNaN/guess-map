@@ -10,6 +10,7 @@ import {
 } from "../map/layers/flags";
 import { setRoutesCountryFilter } from "../map/layers/routes";
 import { setEmptyRegionFilter } from "../map/layers/regions";
+import { setThematicHintSizeScale } from "../map/layers/thematicHints";
 import type { EmptyRegionFilterInfo } from "../types";
 
 export type RoutesFilterMode = "all" | "selected_country";
@@ -75,7 +76,9 @@ export function useLayerState(): LayerState {
 
   const handleFlagSizeScale = useCallback((scale: number) => {
     setFlagSizeScaleVal(scale);
-    if (mapRef.current) setFlagSizeScale(mapRef.current, scale);
+    if (!mapRef.current) return;
+    setFlagSizeScale(mapRef.current, scale);
+    setThematicHintSizeScale(mapRef.current, scale);
   }, []);
 
   const onHintChanged = useCallback(
@@ -97,6 +100,7 @@ export function useLayerState(): LayerState {
       applyMinConfidenceFilter(map, minConfidence);
       setCoverageOpacity(map, coverageOpacity);
       setFlagSizeScale(map, flagSizeScale);
+      setThematicHintSizeScale(map, flagSizeScale);
       setRefreshSignal((v) => v + 1);
     },
     // Intentionally capture initial values only — sync effects handle updates
@@ -118,7 +122,9 @@ export function useLayerState(): LayerState {
 
   // Sync flag icon size to map
   useEffect(() => {
-    if (mapRef.current) setFlagSizeScale(mapRef.current, flagSizeScale);
+    if (!mapRef.current) return;
+    setFlagSizeScale(mapRef.current, flagSizeScale);
+    setThematicHintSizeScale(mapRef.current, flagSizeScale);
   }, [flagSizeScale]);
 
   // Sync empty region filter to map
