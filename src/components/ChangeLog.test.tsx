@@ -45,5 +45,21 @@ describe("ChangeLog", () => {
         }),
       });
     });
+
+    fireEvent.change(screen.getByLabelText("From"), {
+      target: { value: "2026-03-20" },
+    });
+    fireEvent.change(screen.getByLabelText("To"), {
+      target: { value: "2026-03-26" },
+    });
+
+    await waitFor(() => {
+      expect(invokeMock).toHaveBeenLastCalledWith("list_revision_logs", {
+        filter: expect.objectContaining({
+          dateFrom: "2026-03-20 00:00:00",
+          dateTo: "2026-03-26 23:59:59",
+        }),
+      });
+    });
   });
 });
