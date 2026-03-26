@@ -86,6 +86,10 @@ node scripts/gm-agent.mjs fill-phone-codes --country US --force
 node scripts/gm-agent.mjs fill-google-cars
 node scripts/gm-agent.mjs fill-google-cars --country KE --force
 
+# Fill utility poles hints from Geometas category
+node scripts/gm-agent.mjs fill-poles
+node scripts/gm-agent.mjs fill-poles --country BR --force
+
 # Note: regional admin1 phone overrides are currently provided for US/CA.
 # Regional admin1 phone overrides are currently provided for US/CA/BR/AU.
 # Other countries get country-level phone_hint.
@@ -111,11 +115,10 @@ node scripts/gm-agent.mjs delete-hint <hint-id>
 | `country_domain` | text | `tld`, `country_code` | Country ccTLD/domain (`.ru`, `.uk`, ...) |
 | `road_marking` | image | `marking_type` | Road marking style |
 | `sign` | image | `sign_type` | Road signs |
-| `pole` | image | `material`, `color` | Utility poles |
+| `pole` | image | `material`, `color` | Poles |
 | `bollard` | image | `bollard_type` | Bollards |
 | `coverage` | polygon_fill | `provider`, `year` | Street View coverage |
 | `camera_meta` | text | `generation`, `has_blur` | Google Car |
-| `car_type` | icon | `brand`, `model`, `color` | Survey car type |
 | `vegetation` | icon | `biome`, `key_species` | Vegetation type |
 | `note` | text | — | Free-form note |
 | `camera_generation` | polygon_fill | `generation`: gen1-gen4/mixed/unknown | Camera generation |

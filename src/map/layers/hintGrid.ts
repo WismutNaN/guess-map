@@ -76,9 +76,8 @@ const TYPE_PRIORITY: Record<string, number> = {
   road_marking: 50,
   pole: 60,
   bollard: 70,
-  car_type: 80,
-  vegetation: 90,
-  camera_meta: 100,
+  vegetation: 80,
+  camera_meta: 90,
 };
 
 /** Display families that belong in the grid. */

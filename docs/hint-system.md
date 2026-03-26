@@ -98,7 +98,7 @@
 
 Иконка в точке anchor региона.
 
-- **Примеры:** flag, car_type, vegetation, bollard
+- **Примеры:** flag, vegetation
 - **MapLibre:** `symbol` layer с `icon-image`
 - **Данные:** `icon_asset_id` или `hint_type.default_icon`
 
@@ -138,11 +138,10 @@
 | `country_domain` | text | bottom | Национальный домен (ccTLD) |
 | `road_marking` | image | — | Тип дорожной разметки |
 | `sign` | image | — | Дорожные знаки |
-| `pole` | image | — | Столбы и опоры |
+| `pole` | image | — | Столбы |
 | `bollard` | icon | — | Болларды |
 | `coverage` | polygon_fill | — | Покрытие Google/другими |
 | `camera_meta` | text | left | Google Car (признаки машины/камеры) |
-| `car_type` | icon | — | Тип машины съёмки |
 | `vegetation` | icon | — | Растительность |
 | `note` | text | — | Произвольная заметка |
 

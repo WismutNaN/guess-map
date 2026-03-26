@@ -100,7 +100,7 @@
 | Поле | Тип | Описание |
 |------|-----|----------|
 | `id` | TEXT PK | UUID |
-| `code` | TEXT UNIQUE NOT NULL | Машинный код: `flag`, `driving_side`, `script_sample`, `phone_hint`, `road_marking`, `sign`, `pole`, `bollard`, `coverage`, `camera_meta`, `car_type`, `vegetation`, `note`, ... |
+| `code` | TEXT UNIQUE NOT NULL | Машинный код: `flag`, `driving_side`, `script_sample`, `phone_hint`, `road_marking`, `sign`, `pole`, `bollard`, `coverage`, `camera_meta`, `vegetation`, `note`, ... |
 | `title` | TEXT NOT NULL | Человекочитаемое название |
 | `description` | TEXT | Описание типа подсказки |
 | `display_family` | TEXT | Семейство отображения: `polygon_fill`, `icon`, `text`, `image`, `composite` |
@@ -110,7 +110,7 @@
 | `is_active` | BOOLEAN DEFAULT 1 | Показывать ли в списке |
 | `created_at` | TEXT | ISO 8601 |
 
-**Ключевая идея расширяемости:** `schema_json` определяет, какие дополнительные поля есть у подсказок данного типа. Например, для `car_type` это может быть `{"properties": {"brand": {"type": "string"}, "has_blur": {"type": "boolean"}}}`. UI и Agent API используют эту схему для валидации и генерации форм.
+**Ключевая идея расширяемости:** `schema_json` определяет, какие дополнительные поля есть у подсказок данного типа. Например, для `pole` это может быть `{"properties": {"material": {"type": "string"}, "color": {"type": "string"}}}`. UI и Agent API используют эту схему для валидации и генерации форм.
 
 ### 3.3. `hint_type_field`
 
@@ -210,11 +210,10 @@
 | `phone_hint` | Телефонная подсказка | `text` | `{prefix: string, format: string}` |
 | `road_marking` | Дорожная разметка | `image` | `{marking_type: string}` |
 | `sign` | Дорожный знак | `image` | `{sign_type: string}` |
-| `pole` | Столб/опора | `image` | `{material: string, color: string}` |
+| `pole` | Столбы | `image` | `{material: string, color: string}` |
 | `bollard` | Болларды | `image` | `{bollard_type: string}` |
 | `coverage` | Покрытие | `polygon_fill` | `{provider: string, year: number}` |
 | `camera_meta` | Google Car | `text` | `{generation: string, has_blur: boolean}` |
-| `car_type` | Тип машины съёмки | `icon` | `{brand: string, model: string, color: string}` |
 | `vegetation` | Растительность | `icon` | `{biome: string, key_species: string}` |
 | `note` | Заметка | `text` | — |
 
@@ -292,9 +291,7 @@ UI генерирует форму на основе этой схемы. Agent 
 
 ```json
 {
-  "brand": "Google",
-  "model": "Chevrolet Cobalt",
-  "color": "white",
-  "has_blur": true
+  "material": "concrete",
+  "color": "white"
 }
 ```

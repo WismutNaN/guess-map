@@ -58,7 +58,7 @@ const BUILTIN_TYPES: &[HintTypeSeed] = &[
     },
     HintTypeSeed {
         code: "pole",
-        title: "Pole / Utility Post",
+        title: "Poles",
         display_family: "image",
         schema_json: Some(
             r#"{"properties":{"material":{"type":"string"},"color":{"type":"string"}}}"#,
@@ -91,29 +91,20 @@ const BUILTIN_TYPES: &[HintTypeSeed] = &[
         sort_order: 9,
     },
     HintTypeSeed {
-        code: "car_type",
-        title: "Survey Car Type",
-        display_family: "icon",
-        schema_json: Some(
-            r#"{"properties":{"brand":{"type":"string"},"model":{"type":"string"},"color":{"type":"string"}}}"#,
-        ),
-        sort_order: 10,
-    },
-    HintTypeSeed {
         code: "vegetation",
         title: "Vegetation",
         display_family: "icon",
         schema_json: Some(
             r#"{"properties":{"biome":{"type":"string"},"key_species":{"type":"string"}}}"#,
         ),
-        sort_order: 11,
+        sort_order: 10,
     },
     HintTypeSeed {
         code: "note",
         title: "Note",
         display_family: "text",
         schema_json: None,
-        sort_order: 12,
+        sort_order: 11,
     },
     HintTypeSeed {
         code: "camera_generation",
@@ -122,7 +113,7 @@ const BUILTIN_TYPES: &[HintTypeSeed] = &[
         schema_json: Some(
             r#"{"properties":{"generation":{"type":"string","enum":["gen1","gen2","gen3","gen4","mixed","unknown"]}}}"#,
         ),
-        sort_order: 13,
+        sort_order: 12,
     },
     HintTypeSeed {
         code: "highway",
@@ -131,7 +122,7 @@ const BUILTIN_TYPES: &[HintTypeSeed] = &[
         schema_json: Some(
             r#"{"properties":{"route_system":{"type":"string","enum":["us_interstate","us_highway","european_e","national","other"]},"route_number":{"type":"string"},"direction":{"type":"string","enum":["N-S","E-W","NE-SW","NW-SE"]}},"required":["route_system","route_number"]}"#,
         ),
-        sort_order: 14,
+        sort_order: 13,
     },
     HintTypeSeed {
         code: "country_domain",
@@ -140,7 +131,7 @@ const BUILTIN_TYPES: &[HintTypeSeed] = &[
         schema_json: Some(
             r#"{"properties":{"tld":{"type":"string"},"country_code":{"type":"string"}}}"#,
         ),
-        sort_order: 15,
+        sort_order: 14,
     },
 ];
 
@@ -164,6 +155,16 @@ pub fn seed(conn: &Connection) -> Result<usize, String> {
         .map_err(|e| format!("Failed to seed hint_type {}: {}", ht.code, e))?;
         count += changed;
     }
+
+    // Deprecation policy: Survey Car Type is removed as a standalone layer.
+    conn.execute(
+        "UPDATE hint_type
+         SET is_active = 0
+         WHERE code = 'car_type'
+           AND is_active <> 0",
+        [],
+    )
+    .map_err(|e| format!("Failed to deactivate hint_type car_type: {}", e))?;
 
     Ok(count)
 }

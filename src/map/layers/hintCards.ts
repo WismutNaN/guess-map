@@ -61,7 +61,6 @@ const HINT_COLORS: Record<string, string> = {
   country_domain: "#0284c7",
   camera_meta: "#2563eb",
   camera_generation: "#6366f1",
-  car_type: "#14b8a6",
   vegetation: "#22c55e",
   note: "#475569",
 };

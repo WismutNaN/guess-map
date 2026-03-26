@@ -47,7 +47,6 @@ Knowledge Editor — основной интерфейс для наполнен
 ☐ Bollards
 ☐ Coverage
 ☐ Google Car
-☐ Car Type
 ☐ Vegetation
 ☐ Notes
 ───────────────

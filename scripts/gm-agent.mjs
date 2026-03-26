@@ -30,6 +30,8 @@
  *                                        Upsert phone_hint hints (+7, +44, +1 205, ...)
  *   fill-google-cars [--country XX] [--force] [--no-compile]
  *                                        Import Google Car hints from Geometas
+ *   fill-poles [--country XX] [--force] [--no-compile]
+ *                                        Import pole hints from Geometas
  *   upload-asset <file> [--kind K] [--caption C]   Upload image file
  *   upload-asset-url <url> [--name N] [--kind K] [--caption C]  Download & upload image
  *   compile [code1,code2,...]           Recompile hint layers
@@ -72,6 +74,19 @@ const GOOGLE_CAR_COUNTRY_ALIASES = {
   Curaçao: "CW",
   Reunion: "FR",
   Réunion: "FR",
+};
+const POLE_HINT_TYPE = "pole";
+const POLE_SOURCE = "geometas:pole";
+const POLE_CATEGORY_URL = "https://www.geometas.com/metas/categories/poles/";
+const POLE_DETAIL_BASE = "https://www.geometas.com";
+const POLE_DETAIL_COUNTRY_OVERRIDES = {
+  "cd91da35-b515-4d3e-b308-9d40e0519a23": "CW", // Curacao
+};
+const POLE_COUNTRY_ALIASES = {
+  Curacao: "CW",
+  Curaçao: "CW",
+  "South Korea": "KR",
+  "North Macedonia": "MK",
 };
 
 if (!TOKEN) {
@@ -233,6 +248,49 @@ function parseGoogleCarCategoryCards(html) {
   return cards;
 }
 
+function normalizePoleCountry(rawCountry, detailId) {
+  const decoded = decodeHtmlEntities(rawCountry).replace(/\s+/g, " ").trim();
+  const withoutPrefix = decoded.replace(/^[^\p{L}\p{N}]+/u, "").trim();
+
+  if (withoutPrefix && withoutPrefix !== "None") {
+    return POLE_COUNTRY_ALIASES[withoutPrefix] || withoutPrefix;
+  }
+
+  const fallback = POLE_DETAIL_COUNTRY_OVERRIDES[detailId];
+  return fallback || null;
+}
+
+function parsePoleCategoryCards(html) {
+  const cardRegex =
+    /<a href="(\/metas\/detail\/[0-9a-f-]+\/)"\s*>\s*<img[^>]*src="([^"]+)"[\s\S]*?<div class="my-3 md:my-auto">\s*<a href="\1">([\s\S]*?)<\/a>[\s\S]*?<span class="bg-stone-300 text-stone-600 rounded-xl px-2 py-1 font-medium text-xs truncate">\s*([^<]*)<\/span>/gi;
+
+  const cards = [];
+  let match;
+  while ((match = cardRegex.exec(html)) !== null) {
+    const detailPath = match[1];
+    const detailId = detailPath
+      .split("/")
+      .filter(Boolean)
+      .at(-1);
+    if (!detailId) continue;
+
+    const imageUrl = decodeHtmlEntities(match[2]).trim();
+    const description = decodeHtmlEntities(match[3]).replace(/\s+/g, " ").trim();
+    const country = normalizePoleCountry(match[4], detailId);
+    if (!country || !imageUrl) continue;
+
+    cards.push({
+      detailId,
+      sourceUrl: new URL(detailPath, POLE_DETAIL_BASE).toString(),
+      imageUrl,
+      description,
+      country,
+    });
+  }
+
+  return cards;
+}
+
 function inferGoogleCarGeneration(description) {
   if (typeof description !== "string" || !description.trim()) return null;
   const match = description.match(/\b(?:gen(?:eration)?\s*)([1-4])\b/i);
@@ -243,6 +301,40 @@ function inferGoogleCarGeneration(description) {
 function inferGoogleCarHasBlur(description) {
   if (typeof description !== "string" || !description.trim()) return null;
   return /\bblur(?:red|ring)?\b/i.test(description) ? true : null;
+}
+
+function inferPoleMaterial(description) {
+  if (typeof description !== "string" || !description.trim()) return null;
+  const patterns = [
+    ["concrete", /\bconcrete\b/i],
+    ["wood", /\bwood(?:en)?\b/i],
+    ["metal", /\b(?:metal|steel|metallic)\b/i],
+  ];
+  for (const [value, pattern] of patterns) {
+    if (pattern.test(description)) return value;
+  }
+  return null;
+}
+
+function inferPoleColor(description) {
+  if (typeof description !== "string" || !description.trim()) return null;
+  const colors = [
+    "black",
+    "white",
+    "red",
+    "yellow",
+    "grey",
+    "gray",
+    "green",
+    "blue",
+    "silver",
+    "olive",
+  ];
+  const found = colors.find((color) =>
+    new RegExp(`\\b${color}\\b`, "i").test(description)
+  );
+  if (!found) return null;
+  return found === "gray" ? "grey" : found;
 }
 
 async function uploadAssetFromUrl(
@@ -1279,6 +1371,220 @@ async function cmdFillGoogleCars(args) {
   });
 }
 
+async function cmdFillPoles(args) {
+  let countryFilter = null;
+  let force = false;
+  let noCompile = false;
+
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "--country") countryFilter = (args[++i] || "").toUpperCase();
+    else if (args[i] === "--force") force = true;
+    else if (args[i] === "--no-compile") noCompile = true;
+  }
+
+  if (countryFilter && !/^[A-Z]{2}$/.test(countryFilter)) {
+    console.error("Usage: fill-poles [--country XX] [--force] [--no-compile]");
+    process.exit(1);
+  }
+
+  await ensureHintTypeExists(POLE_HINT_TYPE);
+
+  let categoryHtml;
+  try {
+    const res = await fetch(POLE_CATEGORY_URL);
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}`);
+    }
+    categoryHtml = await res.text();
+  } catch (error) {
+    console.error(`Failed to load Geometas category: ${String(error)}`);
+    process.exit(1);
+  }
+
+  const cards = parsePoleCategoryCards(categoryHtml);
+  if (cards.length === 0) {
+    console.error("No poles cards found on Geometas category page.");
+    return;
+  }
+
+  const regionResp = await api("GET", "/api/regions?region_level=country&limit=2000");
+  const countries = Array.isArray(regionResp.items) ? regionResp.items : [];
+  if (countries.length === 0) {
+    console.error("No country regions found.");
+    return;
+  }
+
+  const countryLookup = new Map();
+  const indexCountry = (key, region) => {
+    const normalized = normalizeCountryLookup(key);
+    if (!normalized || countryLookup.has(normalized)) return;
+    countryLookup.set(normalized, region);
+  };
+
+  for (const region of countries) {
+    indexCountry(region?.name, region);
+    indexCountry(region?.name_en, region);
+    indexCountry(region?.country_code, region);
+  }
+
+  const resolveRegion = (countryLabel) => {
+    const alias = POLE_COUNTRY_ALIASES[countryLabel] || countryLabel;
+    return countryLookup.get(normalizeCountryLookup(alias)) || null;
+  };
+
+  const regionStateById = new Map();
+  const loadRegionState = async (regionId) => {
+    if (regionStateById.has(regionId)) {
+      return regionStateById.get(regionId);
+    }
+    const region = await api("GET", `/api/regions/${encodeURIComponent(regionId)}`);
+    const hints = Array.isArray(region?.hints) ? region.hints : [];
+    const seededBySource = new Map();
+    for (const hint of hints) {
+      if (hint?.hint_type_code !== POLE_HINT_TYPE) continue;
+      if (typeof hint?.source_note !== "string") continue;
+      if (!hint.source_note.startsWith(`${POLE_SOURCE} `)) continue;
+      seededBySource.set(hint.source_note, hint);
+    }
+    const state = {
+      seededBySource,
+    };
+    regionStateById.set(regionId, state);
+    return state;
+  };
+
+  let created = 0;
+  let updated = 0;
+  let skippedExisting = 0;
+  let skippedCountry = 0;
+  let filteredOut = 0;
+  let failed = 0;
+  let uploaded = 0;
+
+  for (let i = 0; i < cards.length; i++) {
+    const card = cards[i];
+    const region = resolveRegion(card.country);
+    if (!region) {
+      skippedCountry++;
+      console.error(
+        `[${i + 1}/${cards.length}] skip ${card.country}: country not mapped`
+      );
+      continue;
+    }
+
+    const regionCountry = String(region.country_code || "").toUpperCase();
+    if (countryFilter && regionCountry !== countryFilter) {
+      filteredOut++;
+      continue;
+    }
+
+    const sourceNote = `${POLE_SOURCE} ${card.sourceUrl}`;
+    const state = await loadRegionState(region.id);
+    const existing = state.seededBySource.get(sourceNote);
+
+    if (!force && existing) {
+      skippedExisting++;
+      continue;
+    }
+
+    try {
+      const asset = await uploadAssetFromUrl(card.imageUrl, {
+        kind: "sample",
+        caption: `${card.country} Pole`,
+        fatal: false,
+      });
+      uploaded++;
+
+      const material = inferPoleMaterial(card.description);
+      const poleColor = inferPoleColor(card.description);
+      const existingData =
+        existing && existing.data_json && typeof existing.data_json === "object"
+          ? existing.data_json
+          : {};
+      const dataJson = { ...existingData };
+      if (material) dataJson.material = material;
+      if (poleColor) dataJson.color = poleColor;
+
+      if (existing) {
+        const result = await api(
+          "PUT",
+          `/api/hints/${encodeURIComponent(existing.id)}`,
+          {
+            region_id: existing.region_id || region.id,
+            hint_type_code: POLE_HINT_TYPE,
+            short_value: existing.short_value ?? "Pole",
+            full_value: card.description || existing.full_value || `Pole hint for ${card.country}`,
+            data_json: Object.keys(dataJson).length > 0 ? dataJson : null,
+            color: existing.color ?? null,
+            confidence: existing.confidence ?? 1.0,
+            min_zoom: existing.min_zoom ?? 2.0,
+            max_zoom: existing.max_zoom ?? 11.0,
+            is_visible: existing.is_visible ?? true,
+            image_asset_id: asset.id,
+            icon_asset_id: existing.icon_asset_id ?? null,
+            source_note: sourceNote,
+          },
+          { fatal: false }
+        );
+        state.seededBySource.set(sourceNote, result);
+        updated++;
+        console.error(`[${i + 1}/${cards.length}] updated ${card.country}`);
+      } else {
+        const ordinal = state.seededBySource.size + 1;
+        const shortValue = ordinal > 1 ? `Pole #${ordinal}` : "Pole";
+        const result = await api(
+          "POST",
+          "/api/hints",
+          {
+            region_id: region.id,
+            hint_type_code: POLE_HINT_TYPE,
+            short_value: shortValue,
+            full_value: card.description || `Pole hint for ${card.country}`,
+            data_json: Object.keys(dataJson).length > 0 ? dataJson : null,
+            confidence: 1.0,
+            min_zoom: 2.0,
+            max_zoom: 11.0,
+            is_visible: true,
+            image_asset_id: asset.id,
+            source_note: sourceNote,
+          },
+          { fatal: false }
+        );
+        state.seededBySource.set(sourceNote, result);
+        created++;
+        console.error(`[${i + 1}/${cards.length}] created ${card.country}`);
+      }
+    } catch (error) {
+      failed++;
+      console.error(
+        `[${i + 1}/${cards.length}] failed ${card.country} (${card.sourceUrl}): ${String(error)}`
+      );
+    }
+  }
+
+  const anyChanged = created > 0 || updated > 0;
+  if (!noCompile && anyChanged) {
+    await api("POST", "/api/layers/compile", {
+      hint_type_codes: [POLE_HINT_TYPE],
+    });
+  }
+
+  printJson({
+    hint_type_code: POLE_HINT_TYPE,
+    source: POLE_SOURCE,
+    category_url: POLE_CATEGORY_URL,
+    cards_total: cards.length,
+    created,
+    updated,
+    uploaded,
+    skipped_existing: skippedExisting,
+    skipped_country: skippedCountry,
+    filtered_out: filteredOut,
+    failed,
+    compiled: !noCompile && anyChanged,
+  });
+}
+
 async function cmdCompile(codes) {
   const payload = {};
   if (codes) {
@@ -1341,6 +1647,9 @@ switch (command) {
   case "fill-google-cars":
     await cmdFillGoogleCars(args);
     break;
+  case "fill-poles":
+    await cmdFillPoles(args);
+    break;
   case "upload-asset":
     await cmdUploadAsset(args[0], args.slice(1));
     break;
@@ -1374,6 +1683,8 @@ Commands:
                                         Upsert phone_hint hints (+7, +44, +1 205, ...)
   fill-google-cars [--country XX] [--force] [--no-compile]
                                         Import Google Car hints from Geometas
+  fill-poles [--country XX] [--force] [--no-compile]
+                                        Import poles hints from Geometas
   upload-asset <file> [--kind K] [--caption C]
   upload-asset-url <url> [--name N] [--kind K] [--caption C]
   compile [code1,code2,...]             Recompile layers
