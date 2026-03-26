@@ -1,31 +1,7 @@
-use crate::db::DbState;
+use super::models::{RegionInfo, RegionStats};
 use rusqlite::OptionalExtension;
-use serde::Serialize;
-use tauri::State;
 
-#[derive(Debug, Serialize, Clone)]
-pub struct RegionInfo {
-    pub id: String,
-    pub name: String,
-    pub name_en: Option<String>,
-    pub country_code: Option<String>,
-    pub region_level: String,
-    pub geometry_ref: Option<String>,
-    pub anchor_lng: Option<f64>,
-    pub anchor_lat: Option<f64>,
-}
-
-#[derive(Debug, Serialize)]
-pub struct RegionStats {
-    pub countries: usize,
-    pub admin1: usize,
-    pub total: usize,
-}
-
-#[tauri::command]
-pub fn get_region_stats(db: State<'_, DbState>) -> Result<RegionStats, String> {
-    let conn = db.conn.lock().map_err(|e| e.to_string())?;
-
+pub(crate) fn get_region_stats(conn: &rusqlite::Connection) -> Result<RegionStats, String> {
     let countries: usize = conn
         .query_row(
             "SELECT COUNT(*) FROM region WHERE region_level = 'country'",
@@ -49,49 +25,7 @@ pub fn get_region_stats(db: State<'_, DbState>) -> Result<RegionStats, String> {
     })
 }
 
-#[tauri::command]
-pub fn search_regions(
-    db: State<'_, DbState>,
-    query: String,
-    limit: Option<usize>,
-) -> Result<Vec<RegionInfo>, String> {
-    let conn = db.conn.lock().map_err(|e| e.to_string())?;
-    search_regions_impl(&conn, &query, limit)
-}
-
-#[tauri::command]
-pub fn resolve_region(
-    db: State<'_, DbState>,
-    region_level: String,
-    country_code: Option<String>,
-    geometry_ref: Option<String>,
-    name: Option<String>,
-) -> Result<Option<RegionInfo>, String> {
-    let conn = db.conn.lock().map_err(|e| e.to_string())?;
-    resolve_region_impl(
-        &conn,
-        &region_level,
-        country_code.as_deref(),
-        geometry_ref.as_deref(),
-        name.as_deref(),
-    )
-}
-
-#[tauri::command]
-pub fn get_region_by_id(db: State<'_, DbState>, region_id: String) -> Result<Option<RegionInfo>, String> {
-    let conn = db.conn.lock().map_err(|e| e.to_string())?;
-    conn.query_row(
-        "SELECT id, name, name_en, country_code, region_level, geometry_ref, anchor_lng, anchor_lat
-         FROM region
-         WHERE id = ?1 AND is_active = 1",
-        [region_id],
-        row_to_region_info,
-    )
-    .optional()
-    .map_err(|e| e.to_string())
-}
-
-fn search_regions_impl(
+pub(crate) fn search_regions(
     conn: &rusqlite::Connection,
     query: &str,
     limit: Option<usize>,
@@ -126,7 +60,7 @@ fn search_regions_impl(
     Ok(regions)
 }
 
-fn resolve_region_impl(
+pub(crate) fn resolve_region(
     conn: &rusqlite::Connection,
     region_level: &str,
     country_code: Option<&str>,
@@ -191,6 +125,21 @@ fn resolve_region_impl(
     }
 }
 
+pub(crate) fn get_region_by_id(
+    conn: &rusqlite::Connection,
+    region_id: &str,
+) -> Result<Option<RegionInfo>, String> {
+    conn.query_row(
+        "SELECT id, name, name_en, country_code, region_level, geometry_ref, anchor_lng, anchor_lat
+         FROM region
+         WHERE id = ?1 AND is_active = 1",
+        [region_id],
+        row_to_region_info,
+    )
+    .optional()
+    .map_err(|e| e.to_string())
+}
+
 fn non_empty_trimmed(value: &str) -> Option<&str> {
     let trimmed = value.trim();
     if trimmed.is_empty() {
@@ -211,59 +160,4 @@ fn row_to_region_info(row: &rusqlite::Row<'_>) -> rusqlite::Result<RegionInfo> {
         anchor_lng: row.get(6)?,
         anchor_lat: row.get(7)?,
     })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::db::DbState;
-    use crate::seed::hint_types;
-    use uuid::Uuid;
-
-    fn setup_conn() -> rusqlite::Connection {
-        let db = DbState::new_in_memory().unwrap();
-        let conn = db.conn.into_inner().unwrap();
-        hint_types::seed(&conn).unwrap();
-
-        let country_id = Uuid::new_v4().to_string();
-        conn.execute(
-            "INSERT INTO region (id, name, name_en, country_code, region_level, geometry_ref, anchor_lng, anchor_lat)
-             VALUES (?1, 'India', 'India', 'IN', 'country', 'countries:IN', 78.96, 20.59)",
-            [&country_id],
-        )
-        .unwrap();
-
-        conn.execute(
-            "INSERT INTO region (id, name, name_en, country_code, region_level, parent_id, geometry_ref, anchor_lng, anchor_lat)
-             VALUES (?1, 'Karnataka', 'Karnataka', 'IN', 'admin1', ?2, 'admin1:IN-KA', 76.0, 15.0)",
-            rusqlite::params![Uuid::new_v4().to_string(), country_id],
-        )
-        .unwrap();
-
-        conn
-    }
-
-    #[test]
-    fn test_search_regions_karn() {
-        let conn = setup_conn();
-        let results = search_regions_impl(&conn, "karn", Some(20)).unwrap();
-        assert_eq!(results.len(), 1);
-        assert_eq!(results[0].name, "Karnataka");
-    }
-
-    #[test]
-    fn test_resolve_region_by_geometry_ref() {
-        let conn = setup_conn();
-        let result = resolve_region_impl(
-            &conn,
-            "admin1",
-            Some("IN"),
-            Some("admin1:IN-KA"),
-            Some("Karnataka"),
-        )
-        .unwrap();
-        let region = result.expect("region not found");
-        assert_eq!(region.name, "Karnataka");
-        assert_eq!(region.region_level, "admin1");
-    }
 }

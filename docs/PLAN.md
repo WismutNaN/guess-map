@@ -136,11 +136,11 @@ Tauri-окно с интерактивной картой мира. Пользо
 | 3.2 | ✅ Highlight выбранного региона (feature-state или отдельный layer) | `src/map/layers/selection.ts` |
 | 3.3 | ✅ Region Inspector панель: показать info о выбранном регионе + список hints | `src/components/RegionInspector.tsx` |
 | 3.4 | ✅ Tauri commands: `hint::create`, `hint::update`, `hint::delete` | `src-tauri/src/commands/hints/` |
-| 3.5 | ✅ Tauri command: `region::search` — поиск по имени (LIKE) | `src-tauri/src/commands/regions.rs` |
+| 3.5 | ✅ Tauri command: `region::search` — поиск по имени (LIKE) | `src-tauri/src/commands/regions/` |
 | 3.6 | ✅ SearchBar компонент: autocomplete с debounce, fly to region | `src/components/SearchBar.tsx` |
 | 3.7 | ✅ Форма добавления hint: выбор типа, short_value, full_value, color | `src/components/HintForm.tsx` |
 | 3.8 | ✅ Динамическая генерация полей формы из `hint_type.schema_json` | `src/components/DynamicFields.tsx` |
-| 3.9 | ✅ Загрузка изображений: file picker → копирование в assets → создание asset record | `src/components/AssetUpload.tsx`, `src-tauri/src/commands/asset.rs` |
+| 3.9 | ✅ Загрузка изображений: file picker → копирование в assets → создание asset record | `src/components/AssetUpload.tsx`, `src-tauri/src/commands/asset/` |
 | 3.10 | ✅ Preview загруженного изображения в форме | `src/components/AssetUpload.tsx` |
 | 3.11 | ✅ Revision log: запись при каждом create/update/delete hint | `src-tauri/src/services/revision.rs` |
 | 3.12 | ✅ Live update: после сохранения hint → LayerCompiler → обновление карты | `src/map/hintLayers.ts` |
@@ -172,7 +172,7 @@ Tauri-окно с интерактивной картой мира. Пользо
 - [x] После сохранения hint карта обновляется без перезагрузки
 - [x] Поиск регионов работает с autocomplete
 - [x] Revision log содержит записи для всех операций
-- [ ] Все тесты проходят (TS unit/integration/e2e для Phase 3 ещё не добавлены в репозиторий)
+- [x] Все тесты проходят (`cargo test` + `npm test` + `npm run build`)
 
 ---
 
