@@ -74,6 +74,13 @@ const HINT_COLORS: Record<string, string> = {
   snow_coverage: "#f781be",
   architecture: "#b45309",
   gas_station: "#dc2626",
+  scenery: "#059669",
+  nature: "#15803d",
+  camera_rift: "#be185d",
+  house_number: "#0f766e",
+  license_plate: "#1d4ed8",
+  curb: "#6d28d9",
+  follow_car: "#0d9488",
   vegetation: "#22c55e",
   note: "#475569",
 };

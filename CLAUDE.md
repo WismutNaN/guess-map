@@ -106,6 +106,42 @@ node scripts/gm-agent.mjs fill-architecture --country JP --force
 node scripts/gm-agent.mjs fill-gas-stations
 node scripts/gm-agent.mjs fill-gas-stations --country BR --force
 
+# Fill scenery examples from GeoHints
+node scripts/gm-agent.mjs fill-sceneries
+node scripts/gm-agent.mjs fill-sceneries --country BR --force
+
+# Fill nature examples from GeoHints
+node scripts/gm-agent.mjs fill-nature
+node scripts/gm-agent.mjs fill-nature --country BR --force
+
+# Fill bollards from GeoHints (merge mode, keeps existing bollards)
+node scripts/gm-agent.mjs fill-bollards-geohints
+node scripts/gm-agent.mjs fill-bollards-geohints --country BR --force
+
+# Fill utility poles from GeoHints (merge mode, keeps existing poles)
+node scripts/gm-agent.mjs fill-poles-geohints
+node scripts/gm-agent.mjs fill-poles-geohints --country BR --force
+
+# Fill house number plates from GeoHints
+node scripts/gm-agent.mjs fill-house-numbers
+node scripts/gm-agent.mjs fill-house-numbers --country CZ --force
+
+# Fill license plate examples from GeoHints
+node scripts/gm-agent.mjs fill-license-plates
+node scripts/gm-agent.mjs fill-license-plates --country US --force
+
+# Fill curb examples from GeoHints sidewalks
+node scripts/gm-agent.mjs fill-curbs
+node scripts/gm-agent.mjs fill-curbs --country PT --force
+
+# Fill follow car examples from GeoHints
+node scripts/gm-agent.mjs fill-follow-cars
+node scripts/gm-agent.mjs fill-follow-cars --country NG --force
+
+# Fill camera rift examples from GeoHints
+node scripts/gm-agent.mjs fill-rifts
+node scripts/gm-agent.mjs fill-rifts --country BR --force
+
 # Note: regional admin1 phone overrides are currently provided for US/CA.
 # Regional admin1 phone overrides are currently provided for US/CA/BR/AU.
 # Other countries get country-level phone_hint.
@@ -149,6 +185,13 @@ node scripts/gm-agent.mjs delete-hint <hint-id>
 | `snow_coverage` | polygon_fill | `mode` (`indoor`/`outdoor`/`both`), `source_category` | Snow coverage (single layer: Indoor/Outdoor/Both) |
 | `architecture` | image | `continent`, `map_url`, `image_url` | Architecture examples |
 | `gas_station` | image | `brand`, `map_url`, `image_url`, `variant`, `source_country` | Gas station brands |
+| `scenery` | image | `continent`, `map_url`, `image_url`, `source_country` | Scenery examples |
+| `nature` | image | `continent`, `map_url`, `image_url`, `species`, `source_country` | Nature examples |
+| `camera_rift` | image | `continent`, `map_url`, `image_url`, `location`, `source_country` | Camera rift examples |
+| `house_number` | image | `continent`, `map_url`, `image_url`, `label`, `source_country` | House number plates |
+| `license_plate` | image | `continent`, `map_url`, `image_url`, `label`, `region`, `plate_view`, `period`, `vehicle_type`, `source_country` | License plate examples |
+| `curb` | image | `continent`, `map_url`, `image_url`, `source_country` | Curb examples |
+| `follow_car` | image | `continent`, `map_url`, `image_url`, `label`, `source_country` | Follow car examples |
 | `vegetation` | icon | `biome`, `key_species` | Vegetation type |
 | `note` | text | — | Free-form note |
 | `highway` | line | `route_system`, `route_number`, `direction` | Highway/route |

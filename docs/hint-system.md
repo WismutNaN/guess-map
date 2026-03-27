@@ -156,6 +156,13 @@
 | `snow_coverage` | polygon_fill | — | Snow coverage (единый слой: Indoor/Outdoor/Both) |
 | `architecture` | image | — | Примеры архитектуры |
 | `gas_station` | image | — | Бренды заправок |
+| `scenery` | image | — | Примеры пейзажей |
+| `nature` | image | — | Примеры природы |
+| `camera_rift` | image | — | Примеры дефектов съёмки (рифты камеры) |
+| `house_number` | image | — | Таблички нумерации домов |
+| `license_plate` | image | — | Примеры номерных знаков |
+| `curb` | image | — | Примеры бордюров |
+| `follow_car` | image | — | Примеры Follow Car |
 | `vegetation` | icon | — | Растительность |
 | `note` | text | — | Произвольная заметка |
 

@@ -239,6 +239,69 @@ const BUILTIN_TYPES: &[HintTypeSeed] = &[
         ),
         sort_order: 28,
     },
+    HintTypeSeed {
+        code: "camera_rift",
+        title: "Camera Rift",
+        display_family: "image",
+        schema_json: Some(
+            r#"{"properties":{"continent":{"type":"string"},"map_url":{"type":"string"},"image_url":{"type":"string"},"location":{"type":"string"},"source_country":{"type":"string"}}}"#,
+        ),
+        sort_order: 29,
+    },
+    HintTypeSeed {
+        code: "house_number",
+        title: "House Number",
+        display_family: "image",
+        schema_json: Some(
+            r#"{"properties":{"continent":{"type":"string"},"map_url":{"type":"string"},"image_url":{"type":"string"},"label":{"type":"string"},"source_country":{"type":"string"}}}"#,
+        ),
+        sort_order: 30,
+    },
+    HintTypeSeed {
+        code: "license_plate",
+        title: "License Plate",
+        display_family: "image",
+        schema_json: Some(
+            r#"{"properties":{"continent":{"type":"string"},"map_url":{"type":"string"},"image_url":{"type":"string"},"label":{"type":"string"},"region":{"type":"string"},"plate_view":{"type":"string"},"period":{"type":"string"},"vehicle_type":{"type":"string"},"source_country":{"type":"string"}}}"#,
+        ),
+        sort_order: 31,
+    },
+    HintTypeSeed {
+        code: "curb",
+        title: "Curb",
+        display_family: "image",
+        schema_json: Some(
+            r#"{"properties":{"continent":{"type":"string"},"map_url":{"type":"string"},"image_url":{"type":"string"},"source_country":{"type":"string"}}}"#,
+        ),
+        sort_order: 32,
+    },
+    HintTypeSeed {
+        code: "follow_car",
+        title: "Follow Car",
+        display_family: "image",
+        schema_json: Some(
+            r#"{"properties":{"continent":{"type":"string"},"map_url":{"type":"string"},"image_url":{"type":"string"},"label":{"type":"string"},"source_country":{"type":"string"}}}"#,
+        ),
+        sort_order: 33,
+    },
+    HintTypeSeed {
+        code: "scenery",
+        title: "Scenery",
+        display_family: "image",
+        schema_json: Some(
+            r#"{"properties":{"continent":{"type":"string"},"map_url":{"type":"string"},"image_url":{"type":"string"},"source_country":{"type":"string"}}}"#,
+        ),
+        sort_order: 34,
+    },
+    HintTypeSeed {
+        code: "nature",
+        title: "Nature",
+        display_family: "image",
+        schema_json: Some(
+            r#"{"properties":{"continent":{"type":"string"},"map_url":{"type":"string"},"image_url":{"type":"string"},"species":{"type":"string"},"source_country":{"type":"string"}}}"#,
+        ),
+        sort_order: 35,
+    },
 ];
 
 /// Seed built-in hint types. Idempotent — uses INSERT OR IGNORE per type,
