@@ -71,8 +71,8 @@ const HINT_COLORS: Record<string, string> = {
   camera_trekker_gen3: "#8b5cf6",
   camera_trekker_gen4: "#ec4899",
   camera_gens_tag: "#0f766e",
-  snow_outdoor: "#cc3333",
-  snow_indoor: "#4393c3",
+  snow_coverage: "#f781be",
+  architecture: "#b45309",
   vegetation: "#22c55e",
   note: "#475569",
 };

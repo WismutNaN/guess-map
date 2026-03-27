@@ -94,9 +94,13 @@ node scripts/gm-agent.mjs fill-poles --country BR --force
 node scripts/gm-agent.mjs fill-camera-gens
 node scripts/gm-agent.mjs fill-camera-gens --country JP --force
 
-# Fill snow coverage layers from GeoHints
+# Fill snow coverage layer from GeoHints
 node scripts/gm-agent.mjs fill-snow-coverage
 node scripts/gm-agent.mjs fill-snow-coverage --country BG --force
+
+# Fill architecture examples from GeoHints
+node scripts/gm-agent.mjs fill-architecture
+node scripts/gm-agent.mjs fill-architecture --country JP --force
 
 # Note: regional admin1 phone overrides are currently provided for US/CA.
 # Regional admin1 phone overrides are currently provided for US/CA/BR/AU.
@@ -138,8 +142,8 @@ node scripts/gm-agent.mjs delete-hint <hint-id>
 | `camera_trekker_gen3` | polygon_fill | `category` | Trekker camera: Gen3 |
 | `camera_trekker_gen4` | polygon_fill | `category` | Trekker camera: Gen4 |
 | `camera_gens_tag` | text | `tags[]`, `count` | Country tag with all camera generation types |
-| `snow_outdoor` | polygon_fill | `mode` | Snow coverage (outdoor) |
-| `snow_indoor` | polygon_fill | `mode` | Snow coverage (indoor) |
+| `snow_coverage` | polygon_fill | `mode` (`indoor`/`outdoor`/`both`), `source_category` | Snow coverage (single layer: Indoor/Outdoor/Both) |
+| `architecture` | image | `continent`, `map_url`, `image_url` | Architecture examples |
 | `vegetation` | icon | `biome`, `key_species` | Vegetation type |
 | `note` | text | — | Free-form note |
 | `highway` | line | `route_system`, `route_number`, `direction` | Highway/route |

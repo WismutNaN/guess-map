@@ -213,17 +213,21 @@ const BUILTIN_TYPES: &[HintTypeSeed] = &[
         sort_order: 25,
     },
     HintTypeSeed {
-        code: "snow_outdoor",
-        title: "Snow Outdoor",
+        code: "snow_coverage",
+        title: "Snow Coverage",
         display_family: "polygon_fill",
-        schema_json: Some(r#"{"properties":{"mode":{"type":"string","enum":["outdoor"]}}}"#),
+        schema_json: Some(
+            r#"{"properties":{"mode":{"type":"string","enum":["indoor","outdoor","both"]}}}"#,
+        ),
         sort_order: 26,
     },
     HintTypeSeed {
-        code: "snow_indoor",
-        title: "Snow Indoor",
-        display_family: "polygon_fill",
-        schema_json: Some(r#"{"properties":{"mode":{"type":"string","enum":["indoor"]}}}"#),
+        code: "architecture",
+        title: "Architecture",
+        display_family: "image",
+        schema_json: Some(
+            r#"{"properties":{"continent":{"type":"string"},"map_url":{"type":"string"},"image_url":{"type":"string"}}}"#,
+        ),
         sort_order: 27,
     },
 ];
@@ -249,12 +253,12 @@ pub fn seed(conn: &Connection) -> Result<usize, String> {
         count += changed;
     }
 
-    // Deprecation policy: legacy camera-generation aggregate and Survey Car Type
-    // are removed as standalone layers.
+    // Deprecation policy: legacy camera-generation aggregate, Survey Car Type,
+    // and split snow layers are removed as standalone layers.
     conn.execute(
         "UPDATE hint_type
          SET is_active = 0
-         WHERE code IN ('car_type', 'camera_generation')
+         WHERE code IN ('car_type', 'camera_generation', 'snow_outdoor', 'snow_indoor')
            AND is_active <> 0",
         [],
     )

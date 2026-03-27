@@ -35,7 +35,9 @@
  *   fill-camera-gens [--country XX] [--force] [--no-compile]
  *                                        Import camera generation layers from GeoHints
  *   fill-snow-coverage [--country XX] [--force] [--no-compile]
- *                                        Import snow coverage layers from GeoHints
+ *                                        Import snow coverage layer from GeoHints
+ *   fill-architecture [--country XX] [--force] [--no-compile]
+ *                                        Import architecture examples from GeoHints
  *   upload-asset <file> [--kind K] [--caption C]   Upload image file
  *   upload-asset-url <url> [--name N] [--kind K] [--caption C]  Download & upload image
  *   compile [code1,code2,...]           Recompile hint layers
@@ -191,22 +193,35 @@ const CAMERA_GENS_COUNTRY_ALIASES = {
 };
 const SNOW_COVERAGE_URL = "https://geohints.com/meta/snow";
 const SNOW_COVERAGE_SOURCE = "geohints:snow";
-const SNOW_LAYER_TYPES = [
-  {
-    hintTypeCode: "snow_outdoor",
-    label: "Outdoor",
-    mode: "outdoor",
-    color: "#cc3333",
-  },
-  {
-    hintTypeCode: "snow_indoor",
+const SNOW_HINT_TYPE = "snow_coverage";
+const SNOW_LEGACY_HINT_TYPES = ["snow_outdoor", "snow_indoor"];
+const SNOW_CATEGORY_CONFIG = {
+  Indoor: {
     label: "Indoor",
     mode: "indoor",
     color: "#4393c3",
   },
-];
+  Outdoor: {
+    label: "Outdoor",
+    mode: "outdoor",
+    color: "#cc3333",
+  },
+  Both: {
+    label: "Both",
+    mode: "both",
+    color: "#f781be",
+  },
+};
 const SNOW_COUNTRY_ALIASES = {
   ...CAMERA_GENS_COUNTRY_ALIASES,
+};
+const ARCHITECTURE_HINT_TYPE = "architecture";
+const ARCHITECTURE_SOURCE = "geohints:architecture";
+const ARCHITECTURE_URL = "https://geohints.com/meta/architecture";
+const ARCHITECTURE_COUNTRY_ALIASES = {
+  "South Korea": "KR",
+  "United States": "US",
+  "United Kingdom": "GB",
 };
 
 if (!TOKEN) {
@@ -411,6 +426,39 @@ function parsePoleCategoryCards(html) {
   return cards;
 }
 
+function parseArchitectureCards(html) {
+  const tokenRegex =
+    /<div class="text-center text-3xl font-bold">\s*([^<]+?)\s*<\/div>|<div class="text-white text-md p-2 ">\s*<span class="font-bold">\s*([^<]+?)\s*<\/span>\s*<img[^>]*src="([^"]+)"[^>]*>\s*<a href="([^"]+)"/gi;
+
+  let continent = null;
+  const cards = [];
+  let match;
+  while ((match = tokenRegex.exec(html)) !== null) {
+    if (match[1]) {
+      continent = decodeHtmlEntities(match[1]).replace(/\s+/g, " ").trim();
+      continue;
+    }
+
+    if (!match[2] || !match[3]) continue;
+    const country = decodeHtmlEntities(match[2]).replace(/\s+/g, " ").trim();
+    const rawImageUrl = decodeHtmlEntities(match[3]).trim();
+    const rawMapUrl = decodeHtmlEntities(match[4] || "").trim();
+    if (!country || !rawImageUrl) continue;
+
+    const imageUrl = new URL(rawImageUrl, ARCHITECTURE_URL).toString();
+    const mapUrl = rawMapUrl ? new URL(rawMapUrl, ARCHITECTURE_URL).toString() : null;
+    cards.push({
+      country,
+      continent,
+      imageUrl,
+      mapUrl,
+      sourceUrl: ARCHITECTURE_URL,
+    });
+  }
+
+  return cards;
+}
+
 function parseCameraGensMaps(html) {
   const sections = new Map();
   const blockRegex =
@@ -446,6 +494,11 @@ function resolveCameraGensRegion(countryLabel, countryLookup) {
 
 function resolveSnowCoverageRegion(countryLabel, countryLookup) {
   const alias = SNOW_COUNTRY_ALIASES[countryLabel] || countryLabel;
+  return countryLookup.get(normalizeCountryLookup(alias)) || null;
+}
+
+function resolveArchitectureRegion(countryLabel, countryLookup) {
+  const alias = ARCHITECTURE_COUNTRY_ALIASES[countryLabel] || countryLabel;
   return countryLookup.get(normalizeCountryLookup(alias)) || null;
 }
 
@@ -2079,9 +2132,7 @@ async function cmdFillSnowCoverage(args) {
     process.exit(1);
   }
 
-  for (const cfg of SNOW_LAYER_TYPES) {
-    await ensureHintTypeExists(cfg.hintTypeCode);
-  }
+  await ensureHintTypeExists(SNOW_HINT_TYPE);
 
   let pageHtml;
   try {
@@ -2121,7 +2172,7 @@ async function cmdFillSnowCoverage(args) {
     indexCountry(region?.country_code, region);
   }
 
-  const snowLayerCodes = new Set(SNOW_LAYER_TYPES.map((cfg) => cfg.hintTypeCode));
+  const snowLayerCodes = new Set([SNOW_HINT_TYPE, ...SNOW_LEGACY_HINT_TYPES]);
   const regionStateById = new Map();
   const loadRegionState = async (regionId) => {
     if (regionStateById.has(regionId)) {
@@ -2130,19 +2181,27 @@ async function cmdFillSnowCoverage(args) {
 
     const region = await api("GET", `/api/regions/${encodeURIComponent(regionId)}`);
     const hints = Array.isArray(region?.hints) ? region.hints : [];
-    const seededByType = new Map();
+    let seeded = null;
+    const legacyHints = [];
 
     for (const hint of hints) {
       if (typeof hint?.hint_type_code !== "string") continue;
       if (typeof hint?.source_note !== "string") continue;
       if (!snowLayerCodes.has(hint.hint_type_code)) continue;
       if (!hint.source_note.startsWith(`${SNOW_COVERAGE_SOURCE} `)) continue;
-      if (!seededByType.has(hint.hint_type_code)) {
-        seededByType.set(hint.hint_type_code, hint);
+
+      if (hint.hint_type_code === SNOW_HINT_TYPE) {
+        if (!seeded) {
+          seeded = hint;
+        } else {
+          legacyHints.push(hint);
+        }
+      } else {
+        legacyHints.push(hint);
       }
     }
 
-    const state = { region, seededByType };
+    const state = { region, seeded, legacyHints };
     regionStateById.set(regionId, state);
     return state;
   };
@@ -2155,6 +2214,7 @@ async function cmdFillSnowCoverage(args) {
   let skippedExisting = 0;
   let skippedCountry = 0;
   let filteredOut = 0;
+  let skippedCategory = 0;
   let failed = 0;
 
   for (const [countryLabel, rawCategory] of snowMap.entries()) {
@@ -2171,104 +2231,100 @@ async function cmdFillSnowCoverage(args) {
     }
 
     const category = String(rawCategory || "").trim();
-    const supportsOutdoor = category === "Outdoor" || category === "Both";
-    const supportsIndoor = category === "Indoor" || category === "Both";
-    if (!supportsOutdoor && !supportsIndoor) {
+    const cfg = SNOW_CATEGORY_CONFIG[category];
+    if (!cfg) {
+      skippedCategory++;
       continue;
     }
 
     const state = await loadRegionState(region.id);
 
-    for (const cfg of SNOW_LAYER_TYPES) {
-      const shouldExist =
-        cfg.mode === "outdoor" ? supportsOutdoor : supportsIndoor;
-      const existing = state.seededByType.get(cfg.hintTypeCode);
-      const sourceNote = `${SNOW_COVERAGE_SOURCE} ${SNOW_COVERAGE_URL}#${cfg.mode}`;
+    const sourceNote = `${SNOW_COVERAGE_SOURCE} ${SNOW_COVERAGE_URL}`;
+    const existing = state.seeded;
+    if (!force && existing) {
+      skippedExisting++;
+    } else {
+      const existingData =
+        existing && existing.data_json && typeof existing.data_json === "object"
+          ? existing.data_json
+          : {};
+      const dataJson = {
+        ...existingData,
+        mode: cfg.mode,
+        source_category: category,
+      };
 
-      if (shouldExist) {
-        if (!force && existing) {
-          skippedExisting++;
-          continue;
-        }
-
-        const existingData =
-          existing && existing.data_json && typeof existing.data_json === "object"
-            ? existing.data_json
-            : {};
-        const dataJson = {
-          ...existingData,
-          mode: cfg.mode,
-          source_category: category,
-        };
-
-        try {
-          if (existing) {
-            const result = await api(
-              "PUT",
-              `/api/hints/${encodeURIComponent(existing.id)}`,
-              {
-                region_id: existing.region_id || region.id,
-                hint_type_code: cfg.hintTypeCode,
-                short_value: cfg.label,
-                full_value: `Snow coverage (${cfg.label.toLowerCase()})`,
-                data_json: dataJson,
-                color: cfg.color,
-                confidence: existing.confidence ?? 1.0,
-                min_zoom: existing.min_zoom ?? 2.0,
-                max_zoom: existing.max_zoom ?? 10.0,
-                is_visible: existing.is_visible ?? true,
-                image_asset_id: existing.image_asset_id ?? null,
-                icon_asset_id: existing.icon_asset_id ?? null,
-                source_note: sourceNote,
-              },
-              { fatal: false }
-            );
-            state.seededByType.set(cfg.hintTypeCode, result);
-            updated++;
-          } else {
-            const result = await api(
-              "POST",
-              "/api/hints",
-              {
-                region_id: region.id,
-                hint_type_code: cfg.hintTypeCode,
-                short_value: cfg.label,
-                full_value: `Snow coverage (${cfg.label.toLowerCase()})`,
-                data_json: dataJson,
-                color: cfg.color,
-                confidence: 1.0,
-                min_zoom: 2.0,
-                max_zoom: 10.0,
-                is_visible: true,
-                source_note: sourceNote,
-              },
-              { fatal: false }
-            );
-            state.seededByType.set(cfg.hintTypeCode, result);
-            created++;
-          }
-          touchedHintTypes.add(cfg.hintTypeCode);
-        } catch (error) {
-          failed++;
-          console.error(
-            `[snow ${cfg.mode}] failed ${countryLabel} (${region.id}): ${String(error)}`
+      try {
+        if (existing) {
+          const result = await api(
+            "PUT",
+            `/api/hints/${encodeURIComponent(existing.id)}`,
+            {
+              region_id: existing.region_id || region.id,
+              hint_type_code: SNOW_HINT_TYPE,
+              short_value: cfg.label,
+              full_value: `Snow coverage (${cfg.label.toLowerCase()})`,
+              data_json: dataJson,
+              color: cfg.color,
+              confidence: existing.confidence ?? 1.0,
+              min_zoom: existing.min_zoom ?? 2.0,
+              max_zoom: existing.max_zoom ?? 10.0,
+              is_visible: existing.is_visible ?? true,
+              image_asset_id: existing.image_asset_id ?? null,
+              icon_asset_id: existing.icon_asset_id ?? null,
+              source_note: sourceNote,
+            },
+            { fatal: false }
           );
+          state.seeded = result;
+          updated++;
+        } else {
+          const result = await api(
+            "POST",
+            "/api/hints",
+            {
+              region_id: region.id,
+              hint_type_code: SNOW_HINT_TYPE,
+              short_value: cfg.label,
+              full_value: `Snow coverage (${cfg.label.toLowerCase()})`,
+              data_json: dataJson,
+              color: cfg.color,
+              confidence: 1.0,
+              min_zoom: 2.0,
+              max_zoom: 10.0,
+              is_visible: true,
+              source_note: sourceNote,
+            },
+            { fatal: false }
+          );
+          state.seeded = result;
+          created++;
         }
-      } else if (existing) {
+        touchedHintTypes.add(SNOW_HINT_TYPE);
+      } catch (error) {
+        failed++;
+        console.error(
+          `[snow ${cfg.mode}] failed ${countryLabel} (${region.id}): ${String(error)}`
+        );
+      }
+    }
+
+    if (state.legacyHints.length > 0) {
+      for (const legacyHint of [...state.legacyHints]) {
         try {
           await api(
             "DELETE",
-            `/api/hints/${encodeURIComponent(existing.id)}`,
+            `/api/hints/${encodeURIComponent(legacyHint.id)}`,
             undefined,
             { fatal: false }
           );
-          state.seededByType.delete(cfg.hintTypeCode);
+          state.legacyHints = state.legacyHints.filter((it) => it.id !== legacyHint.id);
           deleted++;
-          touchedHintTypes.add(cfg.hintTypeCode);
+          touchedHintTypes.add(SNOW_HINT_TYPE);
         } catch (error) {
           failed++;
           console.error(
-            `[snow ${cfg.mode}] delete failed ${countryLabel} (${region.id}): ${String(error)}`
+            `[snow legacy] delete failed ${countryLabel} (${region.id}): ${String(error)}`
           );
         }
       }
@@ -2292,9 +2348,221 @@ async function cmdFillSnowCoverage(args) {
     skipped_existing: skippedExisting,
     skipped_country: skippedCountry,
     filtered_out: filteredOut,
+    skipped_category: skippedCategory,
     failed,
     compiled: !noCompile && compiledCodes.length > 0,
     compiled_hint_types: !noCompile && compiledCodes.length > 0 ? compiledCodes : [],
+  });
+}
+
+async function cmdFillArchitecture(args) {
+  let countryFilter = null;
+  let force = false;
+  let noCompile = false;
+
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "--country") countryFilter = (args[++i] || "").toUpperCase();
+    else if (args[i] === "--force") force = true;
+    else if (args[i] === "--no-compile") noCompile = true;
+  }
+
+  if (countryFilter && !/^[A-Z]{2}$/.test(countryFilter)) {
+    console.error("Usage: fill-architecture [--country XX] [--force] [--no-compile]");
+    process.exit(1);
+  }
+
+  await ensureHintTypeExists(ARCHITECTURE_HINT_TYPE);
+
+  let pageHtml;
+  try {
+    const response = await fetch(ARCHITECTURE_URL);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    pageHtml = await response.text();
+  } catch (error) {
+    console.error(`Failed to load GeoHints architecture page: ${String(error)}`);
+    process.exit(1);
+  }
+
+  const cards = parseArchitectureCards(pageHtml);
+  if (cards.length === 0) {
+    console.error("No architecture cards found on GeoHints page.");
+    return;
+  }
+
+  const regionResp = await api("GET", "/api/regions?region_level=country&limit=2000");
+  const countries = Array.isArray(regionResp.items) ? regionResp.items : [];
+  if (countries.length === 0) {
+    console.error("No country regions found.");
+    return;
+  }
+
+  const countryLookup = new Map();
+  const indexCountry = (key, region) => {
+    const normalized = normalizeCountryLookup(key);
+    if (!normalized || countryLookup.has(normalized)) return;
+    countryLookup.set(normalized, region);
+  };
+  for (const region of countries) {
+    indexCountry(region?.name, region);
+    indexCountry(region?.name_en, region);
+    indexCountry(region?.country_code, region);
+  }
+
+  const regionStateById = new Map();
+  const loadRegionState = async (regionId) => {
+    if (regionStateById.has(regionId)) {
+      return regionStateById.get(regionId);
+    }
+    const region = await api("GET", `/api/regions/${encodeURIComponent(regionId)}`);
+    const hints = Array.isArray(region?.hints) ? region.hints : [];
+    const seededBySource = new Map();
+    for (const hint of hints) {
+      if (hint?.hint_type_code !== ARCHITECTURE_HINT_TYPE) continue;
+      if (typeof hint?.source_note !== "string") continue;
+      if (!hint.source_note.startsWith(`${ARCHITECTURE_SOURCE} `)) continue;
+      seededBySource.set(hint.source_note, hint);
+    }
+    const state = {
+      seededBySource,
+    };
+    regionStateById.set(regionId, state);
+    return state;
+  };
+
+  let created = 0;
+  let updated = 0;
+  let skippedExisting = 0;
+  let skippedCountry = 0;
+  let filteredOut = 0;
+  let failed = 0;
+  let uploaded = 0;
+
+  for (let i = 0; i < cards.length; i++) {
+    const card = cards[i];
+    const region = resolveArchitectureRegion(card.country, countryLookup);
+    if (!region) {
+      skippedCountry++;
+      console.error(
+        `[${i + 1}/${cards.length}] skip ${card.country}: country not mapped`
+      );
+      continue;
+    }
+
+    const regionCountry = String(region.country_code || "").toUpperCase();
+    if (countryFilter && regionCountry !== countryFilter) {
+      filteredOut++;
+      continue;
+    }
+
+    const sourceNote = `${ARCHITECTURE_SOURCE} ${card.imageUrl}`;
+    const state = await loadRegionState(region.id);
+    const existing = state.seededBySource.get(sourceNote);
+
+    if (!force && existing) {
+      skippedExisting++;
+      continue;
+    }
+
+    try {
+      const asset = await uploadAssetFromUrl(card.imageUrl, {
+        kind: "sample",
+        caption: `${card.country} architecture`,
+        fatal: false,
+      });
+      uploaded++;
+
+      const existingData =
+        existing && existing.data_json && typeof existing.data_json === "object"
+          ? existing.data_json
+          : {};
+      const dataJson = { ...existingData };
+      if (card.continent) dataJson.continent = card.continent;
+      if (card.mapUrl) dataJson.map_url = card.mapUrl;
+      dataJson.image_url = card.imageUrl;
+
+      const fullValue = card.continent
+        ? `${card.country} architecture (${card.continent})`
+        : `${card.country} architecture`;
+
+      if (existing) {
+        const result = await api(
+          "PUT",
+          `/api/hints/${encodeURIComponent(existing.id)}`,
+          {
+            region_id: existing.region_id || region.id,
+            hint_type_code: ARCHITECTURE_HINT_TYPE,
+            short_value: existing.short_value ?? "Architecture",
+            full_value: fullValue,
+            data_json: Object.keys(dataJson).length > 0 ? dataJson : null,
+            color: existing.color ?? null,
+            confidence: existing.confidence ?? 1.0,
+            min_zoom: existing.min_zoom ?? 2.0,
+            max_zoom: existing.max_zoom ?? 11.0,
+            is_visible: existing.is_visible ?? true,
+            image_asset_id: asset.id,
+            icon_asset_id: existing.icon_asset_id ?? null,
+            source_note: sourceNote,
+          },
+          { fatal: false }
+        );
+        state.seededBySource.set(sourceNote, result);
+        updated++;
+        console.error(`[${i + 1}/${cards.length}] updated ${card.country}`);
+      } else {
+        const ordinal = state.seededBySource.size + 1;
+        const shortValue = ordinal > 1 ? `Architecture #${ordinal}` : "Architecture";
+        const result = await api(
+          "POST",
+          "/api/hints",
+          {
+            region_id: region.id,
+            hint_type_code: ARCHITECTURE_HINT_TYPE,
+            short_value: shortValue,
+            full_value: fullValue,
+            data_json: Object.keys(dataJson).length > 0 ? dataJson : null,
+            confidence: 1.0,
+            min_zoom: 2.0,
+            max_zoom: 11.0,
+            is_visible: true,
+            image_asset_id: asset.id,
+            source_note: sourceNote,
+          },
+          { fatal: false }
+        );
+        state.seededBySource.set(sourceNote, result);
+        created++;
+        console.error(`[${i + 1}/${cards.length}] created ${card.country}`);
+      }
+    } catch (error) {
+      failed++;
+      console.error(
+        `[${i + 1}/${cards.length}] failed ${card.country} (${card.imageUrl}): ${String(error)}`
+      );
+    }
+  }
+
+  const anyChanged = created > 0 || updated > 0;
+  if (!noCompile && anyChanged) {
+    await api("POST", "/api/layers/compile", {
+      hint_type_codes: [ARCHITECTURE_HINT_TYPE],
+    });
+  }
+
+  printJson({
+    hint_type_code: ARCHITECTURE_HINT_TYPE,
+    source: ARCHITECTURE_SOURCE,
+    source_url: ARCHITECTURE_URL,
+    cards_total: cards.length,
+    created,
+    updated,
+    uploaded,
+    skipped_existing: skippedExisting,
+    skipped_country: skippedCountry,
+    filtered_out: filteredOut,
+    failed,
+    compiled: !noCompile && anyChanged,
   });
 }
 
@@ -2369,6 +2637,9 @@ switch (command) {
   case "fill-snow-coverage":
     await cmdFillSnowCoverage(args);
     break;
+  case "fill-architecture":
+    await cmdFillArchitecture(args);
+    break;
   case "upload-asset":
     await cmdUploadAsset(args[0], args.slice(1));
     break;
@@ -2407,7 +2678,9 @@ Commands:
   fill-camera-gens [--country XX] [--force] [--no-compile]
                                         Import camera generation layers from GeoHints
   fill-snow-coverage [--country XX] [--force] [--no-compile]
-                                        Import snow coverage layers from GeoHints
+                                        Import snow coverage layer from GeoHints
+  fill-architecture [--country XX] [--force] [--no-compile]
+                                        Import architecture examples from GeoHints
   upload-asset <file> [--kind K] [--caption C]
   upload-asset-url <url> [--name N] [--kind K] [--caption C]
   compile [code1,code2,...]             Recompile layers

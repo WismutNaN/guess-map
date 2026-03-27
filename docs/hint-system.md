@@ -153,8 +153,8 @@
 | `camera_trekker_gen3` | polygon_fill | — | Trekker (Gen3) |
 | `camera_trekker_gen4` | polygon_fill | — | Trekker (Gen4) |
 | `camera_gens_tag` | text | left | Тег со всеми типами генераций по стране |
-| `snow_outdoor` | polygon_fill | — | Snow coverage (outdoor) |
-| `snow_indoor` | polygon_fill | — | Snow coverage (indoor) |
+| `snow_coverage` | polygon_fill | — | Snow coverage (единый слой: Indoor/Outdoor/Both) |
+| `architecture` | image | — | Примеры архитектуры |
 | `vegetation` | icon | — | Растительность |
 | `note` | text | — | Произвольная заметка |
 
