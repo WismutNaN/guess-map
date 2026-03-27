@@ -90,6 +90,12 @@ export interface HintImageCardOptions {
   height?: number;
 }
 
+export interface HintImageGridCardOptions
+  extends HintImageCardOptions {
+  maxTiles?: number;
+  totalCount?: number;
+}
+
 export interface HintTextCardOptions {
   hintCode: string;
   tag: string;
@@ -294,6 +300,34 @@ function drawFittedImage(
   ctx.drawImage(src, dx, dy, dw, dh);
 }
 
+function chooseGridDimensions(count: number): [number, number] {
+  if (count <= 1) return [1, 1];
+  if (count <= 2) return [2, 1];
+  if (count <= 4) return [2, 2];
+  if (count <= 6) return [3, 2];
+  if (count <= 9) return [3, 3];
+  return [4, 3];
+}
+
+function drawOverflowBadge(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+) {
+  const w = 46;
+  const h = 20;
+  roundRect(ctx, x - w, y, w, h, 6);
+  ctx.fillStyle = "rgba(15, 23, 42, 0.84)";
+  ctx.fill();
+
+  ctx.font = `700 12px "Segoe UI", system-ui, sans-serif`;
+  ctx.fillStyle = "#ffffff";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, x - w / 2, y + h / 2 + 0.5, w - 8);
+}
+
 // ---------------------------------------------------------------------------
 // Word-wrap
 // ---------------------------------------------------------------------------
@@ -409,6 +443,122 @@ export function createHintImageCard(
   ctx.fill();
   ctx.clip();
   drawFittedImage(ctx, source, imgX, imgY, imgW, imgH);
+  ctx.restore();
+
+  // 4. Subtitle (below image)
+  if (subtitle) {
+    drawSubtitle(ctx, subtitle, w, h);
+  }
+
+  return ctx.getImageData(0, 0, canvas.width, canvas.height);
+}
+
+// ---------------------------------------------------------------------------
+// Public: createHintImageGridCard
+// ---------------------------------------------------------------------------
+
+export function createHintImageGridCard(
+  sources: HTMLImageElement[],
+  options: HintImageGridCardOptions,
+): ImageData | HTMLImageElement {
+  const valid = sources.filter((s) => {
+    const nw = s.naturalWidth || s.width;
+    const nh = s.naturalHeight || s.height;
+    return nw > 0 && nh > 0;
+  });
+  if (valid.length === 0) {
+    return createHintTextCard({
+      hintCode: options.hintCode,
+      tag: options.tag,
+      text: "No logos",
+      width: options.width,
+      height: options.height,
+    });
+  }
+
+  const w = options.width ?? CARD_W;
+  const h = options.height ?? CARD_H;
+  const accent = colorForHintCode(options.hintCode);
+  const maxTiles = Math.max(
+    1,
+    Math.min(12, Math.floor(options.maxTiles ?? 12)),
+  );
+  const shown = valid.slice(0, maxTiles);
+  const totalCount = Math.max(shown.length, options.totalCount ?? shown.length);
+  const subtitle =
+    norm(options.subtitle) ??
+    (totalCount > 0 ? `${totalCount} brands` : null);
+
+  const result = makeCanvas(w, h);
+  if (!result) return valid[0];
+  const { canvas, ctx } = result;
+
+  // 1. Frame
+  drawFrame(ctx, w, h, accent);
+
+  // 2. Header strip
+  drawHeader(ctx, options.tag, accent, w);
+
+  // 3. Grid content area
+  const imgX = BORDER + 1;
+  const imgY = CONTENT_Y;
+  const imgW = CONTENT_W - 2;
+  const imgH = subtitle ? CONTENT_H_WITH_SUB : CONTENT_H_FULL;
+
+  ctx.save();
+  roundRect(ctx, imgX, imgY, imgW, imgH, 3);
+  ctx.fillStyle = "#f0f3f8";
+  ctx.fill();
+  ctx.clip();
+
+  const [cols, rows] = chooseGridDimensions(shown.length);
+  const pad = 4;
+  const gap = 4;
+  const gx = imgX + pad;
+  const gy = imgY + pad;
+  const gw = Math.max(1, imgW - pad * 2);
+  const gh = Math.max(1, imgH - pad * 2);
+  const tw = Math.max(
+    1,
+    Math.floor((gw - (cols - 1) * gap) / cols),
+  );
+  const th = Math.max(
+    1,
+    Math.floor((gh - (rows - 1) * gap) / rows),
+  );
+
+  for (let i = 0; i < shown.length; i++) {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    const tx = gx + col * (tw + gap);
+    const ty = gy + row * (th + gap);
+
+    ctx.save();
+    roundRect(ctx, tx, ty, tw, th, 4);
+    ctx.fillStyle = "#ffffff";
+    ctx.fill();
+    ctx.clip();
+    drawFittedImage(
+      ctx,
+      shown[i],
+      tx + 2,
+      ty + 2,
+      Math.max(1, tw - 4),
+      Math.max(1, th - 4),
+    );
+    ctx.restore();
+  }
+
+  const overflow = totalCount - shown.length;
+  if (overflow > 0) {
+    drawOverflowBadge(
+      ctx,
+      `+${overflow}`,
+      imgX + imgW - 6,
+      imgY + 6,
+    );
+  }
+
   ctx.restore();
 
   // 4. Subtitle (below image)

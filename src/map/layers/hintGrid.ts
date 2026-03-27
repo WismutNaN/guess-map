@@ -19,6 +19,7 @@ import { registerLayerGroup } from "../layerManager";
 import {
   colorForHintCode,
   createHintImageCard,
+  createHintImageGridCard,
   createHintTextCard,
   setHintCardImage,
 } from "./hintCards";
@@ -30,6 +31,8 @@ import {
 const SOURCE_ID = "hint-grid";
 export const LAYER_ID = "hint-grid";
 const IMAGE_PREFIX = "hg:";
+const GAS_STATION_CODE = "gas_station";
+const GAS_STATION_MAX_LOGOS = 12;
 
 /** Horizontal spacing between card centres in icon-offset units. */
 const H_SPACING = 255;
@@ -109,16 +112,20 @@ type Props = GeoJSON.GeoJsonProperties & {
   color?: string;
   icon_image_id?: string;
   grid_offset?: [number, number];
+  grouped_asset_ids?: string;
+  grouped_brand_count?: number;
 };
 
 type FC = GeoJSON.FeatureCollection<GeoJSON.Geometry, Props>;
 
 interface CardDescriptor {
   imageId: string;
-  kind: "asset" | "text";
+  kind: "asset" | "asset_grid" | "text";
   hintCode: string;
   tag: string;
   assetId?: string;
+  assetIds?: string[];
+  totalCount?: number;
   text?: string;
   subtitle?: string;
 }
@@ -182,6 +189,16 @@ function imgIdForAsset(code: string, assetId: string): string {
   return `${IMAGE_PREFIX}a:${code}:${assetId}`;
 }
 
+function imgIdForAssetGrid(
+  code: string,
+  groupKey: string,
+  signature: string,
+): string {
+  return `${IMAGE_PREFIX}g:${code}:${hashStr(
+    `${groupKey}|${signature}`,
+  ).toString(16)}`;
+}
+
 function imgIdForText(code: string, text: string): string {
   return `${IMAGE_PREFIX}t:${code}:${hashStr(text).toString(16)}`;
 }
@@ -222,6 +239,16 @@ function chooseText(p: Props): string | null {
 }
 
 function applyImageIds(data: FC, ht: HintTypeInfo): void {
+  if (ht.code === GAS_STATION_CODE) {
+    for (const f of data.features) {
+      const p: Props = f.properties ?? {};
+      p.hint_type_code = ht.code;
+      p.icon_image_id = undefined;
+      f.properties = p;
+    }
+    return;
+  }
+
   const tag = trunc(ht.title, 22);
   for (const f of data.features) {
     const p: Props = f.properties ?? {};
@@ -259,6 +286,130 @@ function applyImageIds(data: FC, ht: HintTypeInfo): void {
     p.icon_image_id = imageId ?? undefined;
     f.properties = p;
   }
+}
+
+function gasStationGroupKey(
+  f: GeoJSON.Feature<GeoJSON.Geometry, Props>,
+  idx: number,
+): string {
+  const cc = norm(f.properties?.country_code);
+  if (cc) return `c:${cc}`;
+  const rid = norm(f.properties?.region_id);
+  if (rid) return `r:${rid}`;
+  return regionKey(f, idx);
+}
+
+function summarizeBrands(
+  brands: string[],
+  maxShown: number,
+): string | null {
+  if (brands.length === 0) return null;
+  const shown = brands.slice(0, maxShown);
+  const suffix =
+    brands.length > shown.length
+      ? ` +${brands.length - shown.length}`
+      : "";
+  return `${shown.join(" • ")}${suffix}`;
+}
+
+function buildGasStationGroupedFeatures(
+  data: FC,
+  ht: HintTypeInfo,
+): GeoJSON.Feature<GeoJSON.Geometry, Props>[] {
+  interface Group {
+    feature: GeoJSON.Feature<GeoJSON.Geometry, Props>;
+    assetIds: string[];
+    assetSet: Set<string>;
+    brands: string[];
+    brandSet: Set<string>;
+  }
+
+  const groups = new Map<string, Group>();
+  for (let i = 0; i < data.features.length; i++) {
+    const src = data.features[i];
+    const srcProps: Props = src.properties ?? {};
+    const key = gasStationGroupKey(src, i);
+
+    let group = groups.get(key);
+    if (!group) {
+      group = {
+        feature: {
+          type: "Feature",
+          geometry: src.geometry,
+          properties: { ...srcProps, hint_type_code: ht.code },
+        },
+        assetIds: [],
+        assetSet: new Set<string>(),
+        brands: [],
+        brandSet: new Set<string>(),
+      };
+      groups.set(key, group);
+    }
+
+    const assetId = chooseAssetId(srcProps);
+    if (assetId && !group.assetSet.has(assetId)) {
+      group.assetSet.add(assetId);
+      group.assetIds.push(assetId);
+    }
+
+    const brand = chooseText(srcProps);
+    if (brand && !group.brandSet.has(brand)) {
+      group.brandSet.add(brand);
+      group.brands.push(brand);
+    }
+  }
+
+  const tag = trunc(ht.title, 22);
+  const out: GeoJSON.Feature<GeoJSON.Geometry, Props>[] = [];
+
+  for (const [key, group] of groups) {
+    const p: Props = group.feature.properties ?? {};
+    p.hint_type_code = ht.code;
+
+    const total = group.assetIds.length;
+    if (total > 0) {
+      const signature = group.assetIds.join("|");
+      const imageId = imgIdForAssetGrid(ht.code, key, signature);
+      if (!cardDescriptors.has(imageId)) {
+        cardDescriptors.set(imageId, {
+          imageId,
+          kind: "asset_grid",
+          hintCode: ht.code,
+          tag,
+          assetIds: group.assetIds.slice(0, GAS_STATION_MAX_LOGOS),
+          totalCount: total,
+          subtitle: `${total} logos`,
+        });
+      }
+
+      p.icon_image_id = imageId;
+      p.icon_asset_id = group.assetIds[0];
+      p.grouped_asset_ids = group.assetIds.join(",");
+      p.grouped_brand_count = group.brands.length;
+      p.short_value = summarizeBrands(group.brands, 4) ?? p.short_value;
+      p.full_value = summarizeBrands(group.brands, 12) ?? p.full_value;
+    } else {
+      const textVal =
+        summarizeBrands(group.brands, 4) ?? "Gas station";
+      const imageId = imgIdForText(ht.code, `${key}|${textVal}`);
+      if (!cardDescriptors.has(imageId)) {
+        cardDescriptors.set(imageId, {
+          imageId,
+          kind: "text",
+          hintCode: ht.code,
+          tag,
+          text: trunc(textVal, 64),
+        });
+      }
+      p.icon_image_id = imageId;
+      p.short_value = textVal;
+    }
+
+    group.feature.properties = p;
+    out.push(group.feature);
+  }
+
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -385,6 +536,30 @@ async function ensureCardImage(
           subtitle: desc.subtitle,
         }),
       );
+    } else if (
+      desc.kind === "asset_grid" &&
+      desc.assetIds &&
+      desc.assetIds.length > 0
+    ) {
+      const imgs = await Promise.all(
+        desc.assetIds.map(async (assetId) => {
+          const dataUrl = await invoke<string>("get_asset_data_url", {
+            assetId,
+          });
+          return loadImgEl(dataUrl);
+        }),
+      );
+      setHintCardImage(
+        map,
+        imageId,
+        createHintImageGridCard(imgs, {
+          hintCode: desc.hintCode,
+          tag: desc.tag,
+          subtitle: desc.subtitle,
+          maxTiles: GAS_STATION_MAX_LOGOS,
+          totalCount: desc.totalCount,
+        }),
+      );
     } else {
       setHintCardImage(
         map,
@@ -455,6 +630,13 @@ function buildMergedData(state: GridState): FC {
   const features: GeoJSON.Feature<GeoJSON.Geometry, Props>[] = [];
   for (const [code, data] of state.rawByType) {
     if (state.hiddenCodes.has(code)) continue;
+    if (code === GAS_STATION_CODE) {
+      const ht = state.types.get(code);
+      if (ht) {
+        features.push(...buildGasStationGroupedFeatures(data, ht));
+        continue;
+      }
+    }
     // Clone features so originals aren't mutated on re-layout
     for (const f of data.features) {
       features.push({
