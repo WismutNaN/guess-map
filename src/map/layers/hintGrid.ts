@@ -629,8 +629,37 @@ function warmupVisibleImages(map: maplibregl.Map): void {
   const features = map.querySourceFeatures(SOURCE_ID);
   const seen = new Set<string>();
   let queued = 0;
+  const canvas = map.getCanvas();
+  const width = canvas.clientWidth;
+  const height = canvas.clientHeight;
+  const margin = 120;
 
   for (const feature of features) {
+    const geometry = feature.geometry;
+    if (
+      geometry?.type !== "Point" ||
+      !Array.isArray(geometry.coordinates) ||
+      geometry.coordinates.length < 2
+    ) {
+      continue;
+    }
+
+    const lng = Number(geometry.coordinates[0]);
+    const lat = Number(geometry.coordinates[1]);
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) {
+      continue;
+    }
+
+    const screenPoint = map.project([lng, lat]);
+    if (
+      screenPoint.x < -margin ||
+      screenPoint.x > width + margin ||
+      screenPoint.y < -margin ||
+      screenPoint.y > height + margin
+    ) {
+      continue;
+    }
+
     const id = norm((feature.properties as Props | undefined)?.icon_image_id);
     if (!id || seen.has(id)) {
       continue;
@@ -643,7 +672,7 @@ function warmupVisibleImages(map: maplibregl.Map): void {
     }
   }
 
-  // Fallback: if source query returned nothing, try rendered features.
+  // Fallback: if source query returned nothing for viewport, try rendered features.
   const rendered = map.queryRenderedFeatures(undefined, {
     layers: [LAYER_ID],
   });
@@ -679,7 +708,6 @@ function bindViewportWarmup(map: maplibregl.Map): void {
   const warmup = () => scheduleViewportWarmup(map);
   map.on("moveend", warmup);
   map.on("zoomend", warmup);
-  map.on("idle", warmup);
   viewportWarmupBound.add(map);
 }
 
