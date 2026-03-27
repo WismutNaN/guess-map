@@ -73,6 +73,7 @@ const HINT_COLORS: Record<string, string> = {
   camera_gens_tag: "#0f766e",
   snow_coverage: "#f781be",
   architecture: "#b45309",
+  gas_station: "#dc2626",
   vegetation: "#22c55e",
   note: "#475569",
 };

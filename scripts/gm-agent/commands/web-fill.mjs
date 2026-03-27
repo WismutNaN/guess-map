@@ -4,6 +4,7 @@ import {
   cmdFillCameraGens,
   cmdFillSnowCoverage,
   cmdFillArchitecture,
+  cmdFillGasStations,
 } from "../fill-hints.mjs";
 
 function webFillDeps(ctx) {
@@ -46,7 +47,12 @@ export const webFillCommands = [
     description: "Import architecture examples from GeoHints",
     run: (args, ctx) => cmdFillArchitecture(args, webFillDeps(ctx)),
   },
+  {
+    name: "fill-gas-stations",
+    usage: "fill-gas-stations [--country XX] [--force] [--no-compile]",
+    description: "Import gas station brands from GeoHints",
+    run: (args, ctx) => cmdFillGasStations(args, webFillDeps(ctx)),
+  },
 ];
 
 export const commands = webFillCommands;
-

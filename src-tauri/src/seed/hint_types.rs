@@ -230,6 +230,15 @@ const BUILTIN_TYPES: &[HintTypeSeed] = &[
         ),
         sort_order: 27,
     },
+    HintTypeSeed {
+        code: "gas_station",
+        title: "Gas Station",
+        display_family: "image",
+        schema_json: Some(
+            r#"{"properties":{"brand":{"type":"string"},"map_url":{"type":"string"},"image_url":{"type":"string"},"variant":{"type":"string"},"source_country":{"type":"string"}}}"#,
+        ),
+        sort_order: 28,
+    },
 ];
 
 /// Seed built-in hint types. Idempotent — uses INSERT OR IGNORE per type,

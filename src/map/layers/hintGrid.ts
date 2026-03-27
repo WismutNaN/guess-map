@@ -73,6 +73,7 @@ const TYPE_PRIORITY: Record<string, number> = {
   camera_gens_tag: 18,
   script_sample: 20,
   architecture: 25,
+  gas_station: 30,
   sign: 40,
   road_marking: 50,
   pole: 60,

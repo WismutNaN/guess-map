@@ -163,6 +163,18 @@ const ARCHITECTURE_COUNTRY_ALIASES = {
   "United States": "US",
   "United Kingdom": "GB",
 };
+const GAS_STATION_HINT_TYPE = "gas_station";
+const GAS_STATION_SOURCE = "geohints:gas_stations";
+const GAS_STATION_URL = "https://geohints.com/meta/companies/gasStations";
+const GAS_STATION_COUNTRY_ALIASES = {
+  ...CAMERA_GENS_COUNTRY_ALIASES,
+  "Curaçao": "CW",
+  "Curacao": "CW",
+  "Hong Kong": "HK",
+  "Christmas Island": "AU",
+  "United Kingdom": "GB",
+  "United States": "US",
+};
 
 function decodeHtmlEntities(value) {
   if (typeof value !== "string") return "";
@@ -314,6 +326,62 @@ function parseArchitectureCards(html) {
   return cards;
 }
 
+function parseGasStationCards(html) {
+  const tokenRegex =
+    /<div class="text-white text-md p-2 ">\s*<span class="font-bold">\s*([^<]+?)\s*<\/span>|<div class="w-full flex flex-col items-center border-2 border-gray-600 p-2">([\s\S]*?)<\/a>\s*<\/div>/gi;
+
+  let currentCountry = null;
+  const cards = [];
+  let match;
+  while ((match = tokenRegex.exec(html)) !== null) {
+    if (match[1]) {
+      currentCountry = decodeHtmlEntities(match[1]).replace(/\s+/g, " ").trim();
+      continue;
+    }
+
+    const block = match[2];
+    if (!block || !currentCountry) continue;
+
+    const brandMatch = block.match(
+      /<div class="text-center font-bold">\s*([^<]+?)\s*<\/div>/i
+    );
+    const mapMatch = block.match(/<a[^>]*href="([^"]+)"/i);
+    const stateTags = [...block.matchAll(
+      /<div class="text-center font-thin">\s*([^<]+?)\s*<\/div>/gi
+    )]
+      .map((x) => decodeHtmlEntities(x[1]).replace(/\s+/g, " ").trim())
+      .filter((x) => x.length > 0);
+    const images = [...block.matchAll(/<img[^>]*src="([^"]+)"/gi)]
+      .map((x) => decodeHtmlEntities(x[1]).trim())
+      .filter((x) => x.length > 0);
+
+    const brand = brandMatch
+      ? decodeHtmlEntities(brandMatch[1]).replace(/\s+/g, " ").trim()
+      : null;
+    const mapUrlRaw = mapMatch ? decodeHtmlEntities(mapMatch[1]).trim() : null;
+    const mapUrl = mapUrlRaw ? new URL(mapUrlRaw, GAS_STATION_URL).toString() : null;
+
+    for (const rawImageUrl of images) {
+      const imageUrl = new URL(rawImageUrl, GAS_STATION_URL).toString();
+      const lowerName = imageUrl.toLowerCase();
+      let variant = null;
+      if (/[_-]old\./.test(lowerName)) variant = "old";
+      else if (/[_-]new\./.test(lowerName)) variant = "new";
+      else if (stateTags.length > 0) variant = stateTags[0].toLowerCase();
+
+      cards.push({
+        country: currentCountry,
+        brand,
+        mapUrl,
+        imageUrl,
+        variant,
+      });
+    }
+  }
+
+  return cards;
+}
+
 function parseCameraGensMaps(html) {
   const sections = new Map();
   const blockRegex =
@@ -354,6 +422,11 @@ function resolveSnowCoverageRegion(countryLabel, countryLookup) {
 
 function resolveArchitectureRegion(countryLabel, countryLookup) {
   const alias = ARCHITECTURE_COUNTRY_ALIASES[countryLabel] || countryLabel;
+  return countryLookup.get(normalizeCountryLookup(alias)) || null;
+}
+
+function resolveGasStationRegion(countryLabel, countryLookup) {
+  const alias = GAS_STATION_COUNTRY_ALIASES[countryLabel] || countryLabel;
   return countryLookup.get(normalizeCountryLookup(alias)) || null;
 }
 
@@ -1600,6 +1673,239 @@ export async function cmdFillArchitecture(args, deps) {
     uploaded,
     skipped_existing: skippedExisting,
     skipped_country: skippedCountry,
+    filtered_out: filteredOut,
+    failed,
+    compiled: !noCompile && anyChanged,
+  });
+}
+
+export async function cmdFillGasStations(args, deps) {
+  const { api, ensureHintTypeExists, uploadAssetFromUrl, printJson } = deps;
+  let countryFilter = null;
+  let force = false;
+  let noCompile = false;
+
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "--country") countryFilter = (args[++i] || "").toUpperCase();
+    else if (args[i] === "--force") force = true;
+    else if (args[i] === "--no-compile") noCompile = true;
+  }
+
+  if (countryFilter && !/^[A-Z]{2}$/.test(countryFilter)) {
+    console.error("Usage: fill-gas-stations [--country XX] [--force] [--no-compile]");
+    process.exit(1);
+  }
+
+  await ensureHintTypeExists(GAS_STATION_HINT_TYPE);
+
+  let pageHtml;
+  try {
+    const response = await fetch(GAS_STATION_URL);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    pageHtml = await response.text();
+  } catch (error) {
+    console.error(`Failed to load GeoHints gas stations page: ${String(error)}`);
+    process.exit(1);
+  }
+
+  const cards = parseGasStationCards(pageHtml);
+  if (cards.length === 0) {
+    console.error("No gas station cards found on GeoHints page.");
+    return;
+  }
+
+  const regionResp = await api("GET", "/api/regions?region_level=country&limit=2000");
+  const countries = Array.isArray(regionResp.items) ? regionResp.items : [];
+  if (countries.length === 0) {
+    console.error("No country regions found.");
+    return;
+  }
+
+  const countryLookup = new Map();
+  const indexCountry = (key, region) => {
+    const normalized = normalizeCountryLookup(key);
+    if (!normalized || countryLookup.has(normalized)) return;
+    countryLookup.set(normalized, region);
+  };
+  for (const region of countries) {
+    indexCountry(region?.name, region);
+    indexCountry(region?.name_en, region);
+    indexCountry(region?.country_code, region);
+  }
+
+  const regionStateById = new Map();
+  const loadRegionState = async (regionId) => {
+    if (regionStateById.has(regionId)) {
+      return regionStateById.get(regionId);
+    }
+    const region = await api("GET", `/api/regions/${encodeURIComponent(regionId)}`);
+    const hints = Array.isArray(region?.hints) ? region.hints : [];
+    const seededBySource = new Map();
+    const labelCounts = new Map();
+
+    for (const hint of hints) {
+      const shortValue = String(hint?.short_value || "").trim();
+      if (shortValue) {
+        labelCounts.set(shortValue, (labelCounts.get(shortValue) || 0) + 1);
+      }
+      if (hint?.hint_type_code !== GAS_STATION_HINT_TYPE) continue;
+      if (typeof hint?.source_note !== "string") continue;
+      if (!hint.source_note.startsWith(`${GAS_STATION_SOURCE} `)) continue;
+      seededBySource.set(hint.source_note, hint);
+    }
+    const state = {
+      seededBySource,
+      labelCounts,
+    };
+    regionStateById.set(regionId, state);
+    return state;
+  };
+
+  let created = 0;
+  let updated = 0;
+  let skippedExisting = 0;
+  let skippedCountry = 0;
+  let filteredOut = 0;
+  let failed = 0;
+  let uploaded = 0;
+  let skippedNoBrand = 0;
+
+  for (let i = 0; i < cards.length; i++) {
+    const card = cards[i];
+    const region = resolveGasStationRegion(card.country, countryLookup);
+    if (!region) {
+      skippedCountry++;
+      continue;
+    }
+
+    const regionCountry = String(region.country_code || "").toUpperCase();
+    if (countryFilter && regionCountry !== countryFilter) {
+      filteredOut++;
+      continue;
+    }
+
+    const brand = typeof card.brand === "string" ? card.brand.trim() : "";
+    if (!brand) {
+      skippedNoBrand++;
+      continue;
+    }
+
+    const sourceNote =
+      `${GAS_STATION_SOURCE} ${card.country} | ${brand} | ${card.imageUrl}`;
+    const state = await loadRegionState(region.id);
+    const existing = state.seededBySource.get(sourceNote);
+    if (!force && existing) {
+      skippedExisting++;
+      continue;
+    }
+
+    try {
+      const asset = await uploadAssetFromUrl(card.imageUrl, {
+        kind: "sample",
+        caption: `${card.country} ${brand} gas station`,
+        fatal: false,
+      });
+      uploaded++;
+
+      const existingData =
+        existing && existing.data_json && typeof existing.data_json === "object"
+          ? existing.data_json
+          : {};
+      const dataJson = { ...existingData };
+      dataJson.brand = brand;
+      dataJson.image_url = card.imageUrl;
+      if (card.mapUrl) dataJson.map_url = card.mapUrl;
+      if (card.variant) dataJson.variant = card.variant;
+      dataJson.source_country = card.country;
+
+      const baseShortValue = card.variant
+        ? `${brand} (${card.variant})`
+        : brand;
+
+      let shortValue = baseShortValue;
+      if (!existing) {
+        const count = (state.labelCounts.get(baseShortValue) || 0) + 1;
+        state.labelCounts.set(baseShortValue, count);
+        if (count > 1) shortValue = `${baseShortValue} #${count}`;
+      }
+
+      const fullValue = card.variant
+        ? `Gas station brand ${brand} (${card.variant}) in ${card.country}`
+        : `Gas station brand ${brand} in ${card.country}`;
+
+      if (existing) {
+        const result = await api(
+          "PUT",
+          `/api/hints/${encodeURIComponent(existing.id)}`,
+          {
+            region_id: existing.region_id || region.id,
+            hint_type_code: GAS_STATION_HINT_TYPE,
+            short_value: shortValue,
+            full_value: fullValue,
+            data_json: Object.keys(dataJson).length > 0 ? dataJson : null,
+            color: existing.color ?? null,
+            confidence: existing.confidence ?? 1.0,
+            min_zoom: existing.min_zoom ?? 2.0,
+            max_zoom: existing.max_zoom ?? 11.0,
+            is_visible: existing.is_visible ?? true,
+            image_asset_id: asset.id,
+            icon_asset_id: existing.icon_asset_id ?? null,
+            source_note: sourceNote,
+          },
+          { fatal: false }
+        );
+        state.seededBySource.set(sourceNote, result);
+        updated++;
+      } else {
+        const result = await api(
+          "POST",
+          "/api/hints",
+          {
+            region_id: region.id,
+            hint_type_code: GAS_STATION_HINT_TYPE,
+            short_value: shortValue,
+            full_value: fullValue,
+            data_json: Object.keys(dataJson).length > 0 ? dataJson : null,
+            confidence: 1.0,
+            min_zoom: 2.0,
+            max_zoom: 11.0,
+            is_visible: true,
+            image_asset_id: asset.id,
+            source_note: sourceNote,
+          },
+          { fatal: false }
+        );
+        state.seededBySource.set(sourceNote, result);
+        created++;
+      }
+    } catch (error) {
+      failed++;
+      console.error(
+        `[${i + 1}/${cards.length}] failed ${card.country} (${brand}): ${String(error)}`
+      );
+    }
+  }
+
+  const anyChanged = created > 0 || updated > 0;
+  if (!noCompile && anyChanged) {
+    await api("POST", "/api/layers/compile", {
+      hint_type_codes: [GAS_STATION_HINT_TYPE],
+    });
+  }
+
+  printJson({
+    hint_type_code: GAS_STATION_HINT_TYPE,
+    source: GAS_STATION_SOURCE,
+    source_url: GAS_STATION_URL,
+    cards_total: cards.length,
+    created,
+    updated,
+    uploaded,
+    skipped_existing: skippedExisting,
+    skipped_country: skippedCountry,
+    skipped_no_brand: skippedNoBrand,
     filtered_out: filteredOut,
     failed,
     compiled: !noCompile && anyChanged,

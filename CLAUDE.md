@@ -102,6 +102,10 @@ node scripts/gm-agent.mjs fill-snow-coverage --country BG --force
 node scripts/gm-agent.mjs fill-architecture
 node scripts/gm-agent.mjs fill-architecture --country JP --force
 
+# Fill gas station brands from GeoHints
+node scripts/gm-agent.mjs fill-gas-stations
+node scripts/gm-agent.mjs fill-gas-stations --country BR --force
+
 # Note: regional admin1 phone overrides are currently provided for US/CA.
 # Regional admin1 phone overrides are currently provided for US/CA/BR/AU.
 # Other countries get country-level phone_hint.
@@ -144,6 +148,7 @@ node scripts/gm-agent.mjs delete-hint <hint-id>
 | `camera_gens_tag` | text | `tags[]`, `count` | Country tag with all camera generation types |
 | `snow_coverage` | polygon_fill | `mode` (`indoor`/`outdoor`/`both`), `source_category` | Snow coverage (single layer: Indoor/Outdoor/Both) |
 | `architecture` | image | `continent`, `map_url`, `image_url` | Architecture examples |
+| `gas_station` | image | `brand`, `map_url`, `image_url`, `variant`, `source_country` | Gas station brands |
 | `vegetation` | icon | `biome`, `key_species` | Vegetation type |
 | `note` | text | — | Free-form note |
 | `highway` | line | `route_system`, `route_number`, `direction` | Highway/route |

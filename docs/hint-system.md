@@ -155,6 +155,7 @@
 | `camera_gens_tag` | text | left | Тег со всеми типами генераций по стране |
 | `snow_coverage` | polygon_fill | — | Snow coverage (единый слой: Indoor/Outdoor/Both) |
 | `architecture` | image | — | Примеры архитектуры |
+| `gas_station` | image | — | Бренды заправок |
 | `vegetation` | icon | — | Растительность |
 | `note` | text | — | Произвольная заметка |
 
