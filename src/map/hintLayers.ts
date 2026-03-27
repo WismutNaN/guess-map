@@ -6,6 +6,7 @@ import {
   setHintGridMinConfidence,
 } from "./layers/hintGrid";
 import { refreshNoteLayer, setNoteMinConfidence } from "./layers/note";
+import { isPolygonHintCode, refreshPolygonHintLayer } from "./layers/polygonHints";
 import { refreshRouteLayers, setRoutesMinConfidence } from "./layers/routes";
 
 export async function refreshHintTypeOnMap(
@@ -27,13 +28,21 @@ export async function refreshHintTypeOnMap(
     return;
   }
 
+  if (isPolygonHintCode(map, hintTypeCode)) {
+    await refreshPolygonHintLayer(map, hintTypeCode);
+    return;
+  }
+
   // All other types (flag, sign, bollard, etc.) are managed by the grid
   if (isHintGridCode(map, hintTypeCode)) {
     await refreshHintGridType(map, hintTypeCode);
     return;
   }
 
-  // Unknown type — attempt grid refresh anyway (might have been added dynamically)
+  // Unknown type — try polygon layer first, then grid as fallback.
+  if (await refreshPolygonHintLayer(map, hintTypeCode)) {
+    return;
+  }
   await refreshHintGridType(map, hintTypeCode);
 }
 

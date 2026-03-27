@@ -142,6 +142,19 @@
 | `bollard` | icon | — | Болларды |
 | `coverage` | polygon_fill | — | Покрытие Google/другими |
 | `camera_meta` | text | left | Google Car (признаки машины/камеры) |
+| `camera_gen1` | polygon_fill | — | Camera Gen 1 |
+| `camera_gen2` | polygon_fill | — | Camera Gen 2 |
+| `camera_gen3` | polygon_fill | — | Camera Gen 3 |
+| `camera_gen4` | polygon_fill | — | Camera Gen 4 |
+| `camera_low_cam` | polygon_fill | — | Low Cam |
+| `camera_shit_cam` | polygon_fill | — | Shit Cam |
+| `camera_small_cam` | polygon_fill | — | Small Cam |
+| `camera_trekker_gen2` | polygon_fill | — | Trekker (Gen2) |
+| `camera_trekker_gen3` | polygon_fill | — | Trekker (Gen3) |
+| `camera_trekker_gen4` | polygon_fill | — | Trekker (Gen4) |
+| `camera_gens_tag` | text | left | Тег со всеми типами генераций по стране |
+| `snow_outdoor` | polygon_fill | — | Snow coverage (outdoor) |
+| `snow_indoor` | polygon_fill | — | Snow coverage (indoor) |
 | `vegetation` | icon | — | Растительность |
 | `note` | text | — | Произвольная заметка |
 

@@ -32,6 +32,10 @@
  *                                        Import Google Car hints from Geometas
  *   fill-poles [--country XX] [--force] [--no-compile]
  *                                        Import pole hints from Geometas
+ *   fill-camera-gens [--country XX] [--force] [--no-compile]
+ *                                        Import camera generation layers from GeoHints
+ *   fill-snow-coverage [--country XX] [--force] [--no-compile]
+ *                                        Import snow coverage layers from GeoHints
  *   upload-asset <file> [--kind K] [--caption C]   Upload image file
  *   upload-asset-url <url> [--name N] [--kind K] [--caption C]  Download & upload image
  *   compile [code1,code2,...]           Recompile hint layers
@@ -87,6 +91,122 @@ const POLE_COUNTRY_ALIASES = {
   Curaçao: "CW",
   "South Korea": "KR",
   "North Macedonia": "MK",
+};
+const CAMERA_GENS_URL = "https://geohints.com/meta/cameraGens";
+const CAMERA_GENS_SOURCE = "geohints:camera_gens";
+const CAMERA_GENS_TAG_SOURCE = "geohints:camera_gens_tag";
+const CAMERA_GENS_TAG_HINT_TYPE = "camera_gens_tag";
+const CAMERA_GENS_LAYER_TYPES = [
+  {
+    mapId: "Gen 1",
+    label: "Gen 1",
+    hintTypeCode: "camera_gen1",
+    slug: "gen1",
+    color: "#ef4444",
+  },
+  {
+    mapId: "Gen 2",
+    label: "Gen 2",
+    hintTypeCode: "camera_gen2",
+    slug: "gen2",
+    color: "#f97316",
+  },
+  {
+    mapId: "Gen 3",
+    label: "Gen 3",
+    hintTypeCode: "camera_gen3",
+    slug: "gen3",
+    color: "#f59e0b",
+  },
+  {
+    mapId: "Gen 4",
+    label: "Gen 4",
+    hintTypeCode: "camera_gen4",
+    slug: "gen4",
+    color: "#22c55e",
+  },
+  {
+    mapId: "Low Cam",
+    label: "Low Cam",
+    hintTypeCode: "camera_low_cam",
+    slug: "low_cam",
+    color: "#06b6d4",
+  },
+  {
+    mapId: "Shit Cam",
+    label: "Shit Cam",
+    hintTypeCode: "camera_shit_cam",
+    slug: "shit_cam",
+    color: "#a855f7",
+  },
+  {
+    mapId: "Small Cam",
+    label: "Small Cam",
+    hintTypeCode: "camera_small_cam",
+    slug: "small_cam",
+    color: "#14b8a6",
+  },
+  {
+    mapId: "Trekker (Gen2)",
+    label: "Trekker (Gen2)",
+    hintTypeCode: "camera_trekker_gen2",
+    slug: "trekker_gen2",
+    color: "#6366f1",
+  },
+  {
+    mapId: "Trekker (Gen3)",
+    label: "Trekker (Gen3)",
+    hintTypeCode: "camera_trekker_gen3",
+    slug: "trekker_gen3",
+    color: "#8b5cf6",
+  },
+  {
+    mapId: "Trekker (Gen4)",
+    label: "Trekker (Gen4)",
+    hintTypeCode: "camera_trekker_gen4",
+    slug: "trekker_gen4",
+    color: "#ec4899",
+  },
+];
+const CAMERA_GENS_COUNTRY_ALIASES = {
+  "Czech Republic": "CZ",
+  "Macao": "MO",
+  "Åland": "AX",
+  "Aland": "AX",
+  "Curaçao": "CW",
+  "Curacao": "CW",
+  "Faroe Islands": "FO",
+  "Isle of Man": "IM",
+  "Christmas Island": "CX",
+  "Cocos (Keeling) Islands": "CC",
+  "South Korea": "KR",
+  "North Macedonia": "MK",
+  "Bosnia and Herzegovina": "BA",
+  "United States Virgin Islands": "VI",
+  "United States Minor Outlying Islands": "UM",
+  "British Indian Ocean Territory": "IO",
+  "Falkland Islands": "FK",
+  "São Tomé and Príncipe": "ST",
+  "Sao Tome and Principe": "ST",
+};
+const SNOW_COVERAGE_URL = "https://geohints.com/meta/snow";
+const SNOW_COVERAGE_SOURCE = "geohints:snow";
+const SNOW_LAYER_TYPES = [
+  {
+    hintTypeCode: "snow_outdoor",
+    label: "Outdoor",
+    mode: "outdoor",
+    color: "#cc3333",
+  },
+  {
+    hintTypeCode: "snow_indoor",
+    label: "Indoor",
+    mode: "indoor",
+    color: "#4393c3",
+  },
+];
+const SNOW_COUNTRY_ALIASES = {
+  ...CAMERA_GENS_COUNTRY_ALIASES,
 };
 
 if (!TOKEN) {
@@ -289,6 +409,44 @@ function parsePoleCategoryCards(html) {
   }
 
   return cards;
+}
+
+function parseCameraGensMaps(html) {
+  const sections = new Map();
+  const blockRegex =
+    /initSimpleMapChart\(document\.getElementById\("([^"]+)"\),\s*\{[\s\S]*?data:\s*\{([\s\S]*?)\}\s*,\s*legend:/g;
+
+  let match;
+  while ((match = blockRegex.exec(html)) !== null) {
+    const mapId = decodeHtmlEntities(match[1]).replace(/\s+/g, " ").trim();
+    const dataBlock = match[2];
+    const countries = new Map();
+
+    const pairRegex = /"([^"]+)":\s*"([^"]*)"/g;
+    let pairMatch;
+    while ((pairMatch = pairRegex.exec(dataBlock)) !== null) {
+      const country = decodeHtmlEntities(pairMatch[1]).replace(/\s+/g, " ").trim();
+      const value = decodeHtmlEntities(pairMatch[2]).replace(/\s+/g, " ").trim();
+      if (!country) continue;
+      countries.set(country, value);
+    }
+
+    if (mapId && countries.size > 0) {
+      sections.set(mapId, countries);
+    }
+  }
+
+  return sections;
+}
+
+function resolveCameraGensRegion(countryLabel, countryLookup) {
+  const alias = CAMERA_GENS_COUNTRY_ALIASES[countryLabel] || countryLabel;
+  return countryLookup.get(normalizeCountryLookup(alias)) || null;
+}
+
+function resolveSnowCoverageRegion(countryLabel, countryLookup) {
+  const alias = SNOW_COUNTRY_ALIASES[countryLabel] || countryLabel;
+  return countryLookup.get(normalizeCountryLookup(alias)) || null;
 }
 
 function inferGoogleCarGeneration(description) {
@@ -1585,6 +1743,561 @@ async function cmdFillPoles(args) {
   });
 }
 
+async function cmdFillCameraGens(args) {
+  let countryFilter = null;
+  let force = false;
+  let noCompile = false;
+
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "--country") countryFilter = (args[++i] || "").toUpperCase();
+    else if (args[i] === "--force") force = true;
+    else if (args[i] === "--no-compile") noCompile = true;
+  }
+
+  if (countryFilter && !/^[A-Z]{2}$/.test(countryFilter)) {
+    console.error("Usage: fill-camera-gens [--country XX] [--force] [--no-compile]");
+    process.exit(1);
+  }
+
+  for (const cfg of CAMERA_GENS_LAYER_TYPES) {
+    await ensureHintTypeExists(cfg.hintTypeCode);
+  }
+  await ensureHintTypeExists(CAMERA_GENS_TAG_HINT_TYPE);
+
+  let pageHtml;
+  try {
+    const response = await fetch(CAMERA_GENS_URL);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    pageHtml = await response.text();
+  } catch (error) {
+    console.error(`Failed to load GeoHints camera gens page: ${String(error)}`);
+    process.exit(1);
+  }
+
+  const mapSections = parseCameraGensMaps(pageHtml);
+  const missingSections = CAMERA_GENS_LAYER_TYPES
+    .map((cfg) => cfg.mapId)
+    .filter((id) => !mapSections.has(id));
+  if (missingSections.length > 0) {
+    console.error(
+      `Warning: missing camera-gens map sections on source page: ${missingSections.join(", ")}`
+    );
+  }
+
+  const regionResp = await api("GET", "/api/regions?region_level=country&limit=2000");
+  const countries = Array.isArray(regionResp.items) ? regionResp.items : [];
+  if (countries.length === 0) {
+    console.error("No country regions found.");
+    return;
+  }
+
+  const countryLookup = new Map();
+  const indexCountry = (key, region) => {
+    const normalized = normalizeCountryLookup(key);
+    if (!normalized || countryLookup.has(normalized)) return;
+    countryLookup.set(normalized, region);
+  };
+  for (const region of countries) {
+    indexCountry(region?.name, region);
+    indexCountry(region?.name_en, region);
+    indexCountry(region?.country_code, region);
+  }
+
+  const cameraLayerCodes = new Set(CAMERA_GENS_LAYER_TYPES.map((cfg) => cfg.hintTypeCode));
+  const regionStateById = new Map();
+  const loadRegionState = async (regionId) => {
+    if (regionStateById.has(regionId)) {
+      return regionStateById.get(regionId);
+    }
+
+    const region = await api("GET", `/api/regions/${encodeURIComponent(regionId)}`);
+    const hints = Array.isArray(region?.hints) ? region.hints : [];
+    const seededByType = new Map();
+    let seededTag = null;
+
+    for (const hint of hints) {
+      if (typeof hint?.hint_type_code !== "string") continue;
+      if (typeof hint?.source_note !== "string") continue;
+
+      if (
+        cameraLayerCodes.has(hint.hint_type_code) &&
+        hint.source_note.startsWith(`${CAMERA_GENS_SOURCE} `) &&
+        !seededByType.has(hint.hint_type_code)
+      ) {
+        seededByType.set(hint.hint_type_code, hint);
+        continue;
+      }
+
+      if (
+        hint.hint_type_code === CAMERA_GENS_TAG_HINT_TYPE &&
+        hint.source_note.startsWith(`${CAMERA_GENS_TAG_SOURCE} `) &&
+        !seededTag
+      ) {
+        seededTag = hint;
+      }
+    }
+
+    const state = { region, seededByType, seededTag };
+    regionStateById.set(regionId, state);
+    return state;
+  };
+
+  const summaryLabelsByRegion = new Map();
+  const touchedHintTypes = new Set();
+
+  let created = 0;
+  let updated = 0;
+  let skippedExisting = 0;
+  let skippedCountry = 0;
+  let filteredOut = 0;
+  let failed = 0;
+
+  for (const cfg of CAMERA_GENS_LAYER_TYPES) {
+    const countriesMap = mapSections.get(cfg.mapId);
+    if (!countriesMap) continue;
+
+    for (const [countryLabel] of countriesMap.entries()) {
+      const region = resolveCameraGensRegion(countryLabel, countryLookup);
+      if (!region) {
+        skippedCountry++;
+        continue;
+      }
+
+      const regionCountry = String(region.country_code || "").toUpperCase();
+      if (countryFilter && regionCountry !== countryFilter) {
+        filteredOut++;
+        continue;
+      }
+
+      let labels = summaryLabelsByRegion.get(region.id);
+      if (!labels) {
+        labels = new Set();
+        summaryLabelsByRegion.set(region.id, labels);
+      }
+      labels.add(cfg.label);
+
+      const state = await loadRegionState(region.id);
+      const existing = state.seededByType.get(cfg.hintTypeCode);
+
+      if (!force && existing) {
+        skippedExisting++;
+        continue;
+      }
+
+      const sourceNote = `${CAMERA_GENS_SOURCE} ${CAMERA_GENS_URL}#${cfg.slug}`;
+      const existingData =
+        existing && existing.data_json && typeof existing.data_json === "object"
+          ? existing.data_json
+          : {};
+      const dataJson = {
+        ...existingData,
+        category: cfg.slug,
+        label: cfg.label,
+      };
+
+      try {
+        if (existing) {
+          const result = await api(
+            "PUT",
+            `/api/hints/${encodeURIComponent(existing.id)}`,
+            {
+              region_id: existing.region_id || region.id,
+              hint_type_code: cfg.hintTypeCode,
+              short_value: cfg.label,
+              full_value: `Camera layer ${cfg.label}`,
+              data_json: dataJson,
+              color: cfg.color,
+              confidence: existing.confidence ?? 1.0,
+              min_zoom: existing.min_zoom ?? 2.0,
+              max_zoom: existing.max_zoom ?? 10.0,
+              is_visible: existing.is_visible ?? true,
+              image_asset_id: existing.image_asset_id ?? null,
+              icon_asset_id: existing.icon_asset_id ?? null,
+              source_note: sourceNote,
+            },
+            { fatal: false }
+          );
+          state.seededByType.set(cfg.hintTypeCode, result);
+          updated++;
+        } else {
+          const result = await api(
+            "POST",
+            "/api/hints",
+            {
+              region_id: region.id,
+              hint_type_code: cfg.hintTypeCode,
+              short_value: cfg.label,
+              full_value: `Camera layer ${cfg.label}`,
+              data_json: dataJson,
+              color: cfg.color,
+              confidence: 1.0,
+              min_zoom: 2.0,
+              max_zoom: 10.0,
+              is_visible: true,
+              source_note: sourceNote,
+            },
+            { fatal: false }
+          );
+          state.seededByType.set(cfg.hintTypeCode, result);
+          created++;
+        }
+        touchedHintTypes.add(cfg.hintTypeCode);
+      } catch (error) {
+        failed++;
+        console.error(
+          `[${cfg.label}] failed ${countryLabel} (${region.id}): ${String(error)}`
+        );
+      }
+    }
+  }
+
+  let tagCreated = 0;
+  let tagUpdated = 0;
+  let tagSkipped = 0;
+  let tagFailed = 0;
+
+  for (const [regionId, labelsSet] of summaryLabelsByRegion.entries()) {
+    const orderedLabels = CAMERA_GENS_LAYER_TYPES.map((cfg) => cfg.label).filter((label) =>
+      labelsSet.has(label)
+    );
+    if (orderedLabels.length === 0) continue;
+
+    const state = await loadRegionState(regionId);
+    const existing = state.seededTag;
+    const shortValue = orderedLabels.join(" | ");
+    const fullValue = `Camera generations: ${orderedLabels.join(", ")}`;
+    const dataJson = {
+      tags: orderedLabels,
+      count: orderedLabels.length,
+    };
+    const sourceNote = `${CAMERA_GENS_TAG_SOURCE} ${CAMERA_GENS_URL}`;
+    const unchanged =
+      existing &&
+      String(existing.short_value || "").trim() === shortValue &&
+      String(existing.full_value || "").trim() === fullValue;
+
+    if (!force && unchanged) {
+      tagSkipped++;
+      continue;
+    }
+
+    try {
+      if (existing) {
+        const result = await api(
+          "PUT",
+          `/api/hints/${encodeURIComponent(existing.id)}`,
+          {
+            region_id: existing.region_id || regionId,
+            hint_type_code: CAMERA_GENS_TAG_HINT_TYPE,
+            short_value: shortValue,
+            full_value: fullValue,
+            data_json: dataJson,
+            color: existing.color ?? null,
+            confidence: existing.confidence ?? 1.0,
+            min_zoom: existing.min_zoom ?? 2.0,
+            max_zoom: existing.max_zoom ?? 11.0,
+            is_visible: existing.is_visible ?? true,
+            image_asset_id: existing.image_asset_id ?? null,
+            icon_asset_id: existing.icon_asset_id ?? null,
+            source_note: sourceNote,
+          },
+          { fatal: false }
+        );
+        state.seededTag = result;
+        tagUpdated++;
+      } else {
+        const result = await api(
+          "POST",
+          "/api/hints",
+          {
+            region_id: regionId,
+            hint_type_code: CAMERA_GENS_TAG_HINT_TYPE,
+            short_value: shortValue,
+            full_value: fullValue,
+            data_json: dataJson,
+            confidence: 1.0,
+            min_zoom: 2.0,
+            max_zoom: 11.0,
+            is_visible: true,
+            source_note: sourceNote,
+          },
+          { fatal: false }
+        );
+        state.seededTag = result;
+        tagCreated++;
+      }
+      touchedHintTypes.add(CAMERA_GENS_TAG_HINT_TYPE);
+    } catch (error) {
+      tagFailed++;
+      console.error(`[camera_gens_tag] failed ${regionId}: ${String(error)}`);
+    }
+  }
+
+  const compiledCodes = [...touchedHintTypes];
+  if (!noCompile && compiledCodes.length > 0) {
+    await api("POST", "/api/layers/compile", {
+      hint_type_codes: compiledCodes,
+    });
+  }
+
+  printJson({
+    source: CAMERA_GENS_SOURCE,
+    category_url: CAMERA_GENS_URL,
+    layer_count: CAMERA_GENS_LAYER_TYPES.length,
+    missing_sections: missingSections,
+    created,
+    updated,
+    skipped_existing: skippedExisting,
+    skipped_country: skippedCountry,
+    filtered_out: filteredOut,
+    failed,
+    tag_hint_type_code: CAMERA_GENS_TAG_HINT_TYPE,
+    tag_created: tagCreated,
+    tag_updated: tagUpdated,
+    tag_skipped: tagSkipped,
+    tag_failed: tagFailed,
+    compiled: !noCompile && compiledCodes.length > 0,
+    compiled_hint_types: !noCompile && compiledCodes.length > 0 ? compiledCodes : [],
+  });
+}
+
+async function cmdFillSnowCoverage(args) {
+  let countryFilter = null;
+  let force = false;
+  let noCompile = false;
+
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "--country") countryFilter = (args[++i] || "").toUpperCase();
+    else if (args[i] === "--force") force = true;
+    else if (args[i] === "--no-compile") noCompile = true;
+  }
+
+  if (countryFilter && !/^[A-Z]{2}$/.test(countryFilter)) {
+    console.error("Usage: fill-snow-coverage [--country XX] [--force] [--no-compile]");
+    process.exit(1);
+  }
+
+  for (const cfg of SNOW_LAYER_TYPES) {
+    await ensureHintTypeExists(cfg.hintTypeCode);
+  }
+
+  let pageHtml;
+  try {
+    const response = await fetch(SNOW_COVERAGE_URL);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    pageHtml = await response.text();
+  } catch (error) {
+    console.error(`Failed to load GeoHints snow page: ${String(error)}`);
+    process.exit(1);
+  }
+
+  const mapSections = parseCameraGensMaps(pageHtml);
+  const snowMap = mapSections.get("map");
+  if (!snowMap || snowMap.size === 0) {
+    console.error("No snow coverage map data found on GeoHints page.");
+    process.exit(1);
+  }
+
+  const regionResp = await api("GET", "/api/regions?region_level=country&limit=2000");
+  const countries = Array.isArray(regionResp.items) ? regionResp.items : [];
+  if (countries.length === 0) {
+    console.error("No country regions found.");
+    return;
+  }
+
+  const countryLookup = new Map();
+  const indexCountry = (key, region) => {
+    const normalized = normalizeCountryLookup(key);
+    if (!normalized || countryLookup.has(normalized)) return;
+    countryLookup.set(normalized, region);
+  };
+  for (const region of countries) {
+    indexCountry(region?.name, region);
+    indexCountry(region?.name_en, region);
+    indexCountry(region?.country_code, region);
+  }
+
+  const snowLayerCodes = new Set(SNOW_LAYER_TYPES.map((cfg) => cfg.hintTypeCode));
+  const regionStateById = new Map();
+  const loadRegionState = async (regionId) => {
+    if (regionStateById.has(regionId)) {
+      return regionStateById.get(regionId);
+    }
+
+    const region = await api("GET", `/api/regions/${encodeURIComponent(regionId)}`);
+    const hints = Array.isArray(region?.hints) ? region.hints : [];
+    const seededByType = new Map();
+
+    for (const hint of hints) {
+      if (typeof hint?.hint_type_code !== "string") continue;
+      if (typeof hint?.source_note !== "string") continue;
+      if (!snowLayerCodes.has(hint.hint_type_code)) continue;
+      if (!hint.source_note.startsWith(`${SNOW_COVERAGE_SOURCE} `)) continue;
+      if (!seededByType.has(hint.hint_type_code)) {
+        seededByType.set(hint.hint_type_code, hint);
+      }
+    }
+
+    const state = { region, seededByType };
+    regionStateById.set(regionId, state);
+    return state;
+  };
+
+  const touchedHintTypes = new Set();
+
+  let created = 0;
+  let updated = 0;
+  let deleted = 0;
+  let skippedExisting = 0;
+  let skippedCountry = 0;
+  let filteredOut = 0;
+  let failed = 0;
+
+  for (const [countryLabel, rawCategory] of snowMap.entries()) {
+    const region = resolveSnowCoverageRegion(countryLabel, countryLookup);
+    if (!region) {
+      skippedCountry++;
+      continue;
+    }
+
+    const regionCountry = String(region.country_code || "").toUpperCase();
+    if (countryFilter && regionCountry !== countryFilter) {
+      filteredOut++;
+      continue;
+    }
+
+    const category = String(rawCategory || "").trim();
+    const supportsOutdoor = category === "Outdoor" || category === "Both";
+    const supportsIndoor = category === "Indoor" || category === "Both";
+    if (!supportsOutdoor && !supportsIndoor) {
+      continue;
+    }
+
+    const state = await loadRegionState(region.id);
+
+    for (const cfg of SNOW_LAYER_TYPES) {
+      const shouldExist =
+        cfg.mode === "outdoor" ? supportsOutdoor : supportsIndoor;
+      const existing = state.seededByType.get(cfg.hintTypeCode);
+      const sourceNote = `${SNOW_COVERAGE_SOURCE} ${SNOW_COVERAGE_URL}#${cfg.mode}`;
+
+      if (shouldExist) {
+        if (!force && existing) {
+          skippedExisting++;
+          continue;
+        }
+
+        const existingData =
+          existing && existing.data_json && typeof existing.data_json === "object"
+            ? existing.data_json
+            : {};
+        const dataJson = {
+          ...existingData,
+          mode: cfg.mode,
+          source_category: category,
+        };
+
+        try {
+          if (existing) {
+            const result = await api(
+              "PUT",
+              `/api/hints/${encodeURIComponent(existing.id)}`,
+              {
+                region_id: existing.region_id || region.id,
+                hint_type_code: cfg.hintTypeCode,
+                short_value: cfg.label,
+                full_value: `Snow coverage (${cfg.label.toLowerCase()})`,
+                data_json: dataJson,
+                color: cfg.color,
+                confidence: existing.confidence ?? 1.0,
+                min_zoom: existing.min_zoom ?? 2.0,
+                max_zoom: existing.max_zoom ?? 10.0,
+                is_visible: existing.is_visible ?? true,
+                image_asset_id: existing.image_asset_id ?? null,
+                icon_asset_id: existing.icon_asset_id ?? null,
+                source_note: sourceNote,
+              },
+              { fatal: false }
+            );
+            state.seededByType.set(cfg.hintTypeCode, result);
+            updated++;
+          } else {
+            const result = await api(
+              "POST",
+              "/api/hints",
+              {
+                region_id: region.id,
+                hint_type_code: cfg.hintTypeCode,
+                short_value: cfg.label,
+                full_value: `Snow coverage (${cfg.label.toLowerCase()})`,
+                data_json: dataJson,
+                color: cfg.color,
+                confidence: 1.0,
+                min_zoom: 2.0,
+                max_zoom: 10.0,
+                is_visible: true,
+                source_note: sourceNote,
+              },
+              { fatal: false }
+            );
+            state.seededByType.set(cfg.hintTypeCode, result);
+            created++;
+          }
+          touchedHintTypes.add(cfg.hintTypeCode);
+        } catch (error) {
+          failed++;
+          console.error(
+            `[snow ${cfg.mode}] failed ${countryLabel} (${region.id}): ${String(error)}`
+          );
+        }
+      } else if (existing) {
+        try {
+          await api(
+            "DELETE",
+            `/api/hints/${encodeURIComponent(existing.id)}`,
+            undefined,
+            { fatal: false }
+          );
+          state.seededByType.delete(cfg.hintTypeCode);
+          deleted++;
+          touchedHintTypes.add(cfg.hintTypeCode);
+        } catch (error) {
+          failed++;
+          console.error(
+            `[snow ${cfg.mode}] delete failed ${countryLabel} (${region.id}): ${String(error)}`
+          );
+        }
+      }
+    }
+  }
+
+  const compiledCodes = [...touchedHintTypes];
+  if (!noCompile && compiledCodes.length > 0) {
+    await api("POST", "/api/layers/compile", {
+      hint_type_codes: compiledCodes,
+    });
+  }
+
+  printJson({
+    source: SNOW_COVERAGE_SOURCE,
+    category_url: SNOW_COVERAGE_URL,
+    countries_total: snowMap.size,
+    created,
+    updated,
+    deleted,
+    skipped_existing: skippedExisting,
+    skipped_country: skippedCountry,
+    filtered_out: filteredOut,
+    failed,
+    compiled: !noCompile && compiledCodes.length > 0,
+    compiled_hint_types: !noCompile && compiledCodes.length > 0 ? compiledCodes : [],
+  });
+}
+
 async function cmdCompile(codes) {
   const payload = {};
   if (codes) {
@@ -1650,6 +2363,12 @@ switch (command) {
   case "fill-poles":
     await cmdFillPoles(args);
     break;
+  case "fill-camera-gens":
+    await cmdFillCameraGens(args);
+    break;
+  case "fill-snow-coverage":
+    await cmdFillSnowCoverage(args);
+    break;
   case "upload-asset":
     await cmdUploadAsset(args[0], args.slice(1));
     break;
@@ -1685,6 +2404,10 @@ Commands:
                                         Import Google Car hints from Geometas
   fill-poles [--country XX] [--force] [--no-compile]
                                         Import poles hints from Geometas
+  fill-camera-gens [--country XX] [--force] [--no-compile]
+                                        Import camera generation layers from GeoHints
+  fill-snow-coverage [--country XX] [--force] [--no-compile]
+                                        Import snow coverage layers from GeoHints
   upload-asset <file> [--kind K] [--caption C]
   upload-asset-url <url> [--name N] [--kind K] [--caption C]
   compile [code1,code2,...]             Recompile layers

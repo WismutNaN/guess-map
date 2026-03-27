@@ -5,6 +5,7 @@ import {
   addDrivingSideLayer,
   addHintGridLayer,
   addNoteLayer,
+  addPolygonHintLayers,
   addRegionLayers,
   addRouteLayers,
 } from "./layers";
@@ -17,6 +18,7 @@ type LayerBootstrapStep = {
 const LAYER_BOOTSTRAP_STEPS: LayerBootstrapStep[] = [
   { label: "region layers", run: addRegionLayers },
   { label: "driving_side layer", run: addDrivingSideLayer },
+  { label: "polygon hint layers", run: addPolygonHintLayers },
   { label: "city layers", run: addCityLayers },
   // Coverage must stay below hint symbols so flags/notes remain readable.
   { label: "coverage layer", run: addCoverageLayer },

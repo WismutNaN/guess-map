@@ -90,6 +90,14 @@ node scripts/gm-agent.mjs fill-google-cars --country KE --force
 node scripts/gm-agent.mjs fill-poles
 node scripts/gm-agent.mjs fill-poles --country BR --force
 
+# Fill camera generation layers from GeoHints
+node scripts/gm-agent.mjs fill-camera-gens
+node scripts/gm-agent.mjs fill-camera-gens --country JP --force
+
+# Fill snow coverage layers from GeoHints
+node scripts/gm-agent.mjs fill-snow-coverage
+node scripts/gm-agent.mjs fill-snow-coverage --country BG --force
+
 # Note: regional admin1 phone overrides are currently provided for US/CA.
 # Regional admin1 phone overrides are currently provided for US/CA/BR/AU.
 # Other countries get country-level phone_hint.
@@ -119,9 +127,21 @@ node scripts/gm-agent.mjs delete-hint <hint-id>
 | `bollard` | image | `bollard_type` | Bollards |
 | `coverage` | polygon_fill | `provider`, `year` | Street View coverage |
 | `camera_meta` | text | `generation`, `has_blur` | Google Car |
+| `camera_gen1` | polygon_fill | `category` | Camera generation: Gen 1 |
+| `camera_gen2` | polygon_fill | `category` | Camera generation: Gen 2 |
+| `camera_gen3` | polygon_fill | `category` | Camera generation: Gen 3 |
+| `camera_gen4` | polygon_fill | `category` | Camera generation: Gen 4 |
+| `camera_low_cam` | polygon_fill | `category` | Camera special: Low Cam |
+| `camera_shit_cam` | polygon_fill | `category` | Camera special: Shit Cam |
+| `camera_small_cam` | polygon_fill | `category` | Camera special: Small Cam |
+| `camera_trekker_gen2` | polygon_fill | `category` | Trekker camera: Gen2 |
+| `camera_trekker_gen3` | polygon_fill | `category` | Trekker camera: Gen3 |
+| `camera_trekker_gen4` | polygon_fill | `category` | Trekker camera: Gen4 |
+| `camera_gens_tag` | text | `tags[]`, `count` | Country tag with all camera generation types |
+| `snow_outdoor` | polygon_fill | `mode` | Snow coverage (outdoor) |
+| `snow_indoor` | polygon_fill | `mode` | Snow coverage (indoor) |
 | `vegetation` | icon | `biome`, `key_species` | Vegetation type |
 | `note` | text | — | Free-form note |
-| `camera_generation` | polygon_fill | `generation`: gen1-gen4/mixed/unknown | Camera generation |
 | `highway` | line | `route_system`, `route_number`, `direction` | Highway/route |
 
 ### Layering Policy

@@ -133,6 +133,99 @@ const BUILTIN_TYPES: &[HintTypeSeed] = &[
         ),
         sort_order: 14,
     },
+    HintTypeSeed {
+        code: "camera_gen1",
+        title: "Camera Gen 1",
+        display_family: "polygon_fill",
+        schema_json: Some(r#"{"properties":{"category":{"type":"string"}}}"#),
+        sort_order: 15,
+    },
+    HintTypeSeed {
+        code: "camera_gen2",
+        title: "Camera Gen 2",
+        display_family: "polygon_fill",
+        schema_json: Some(r#"{"properties":{"category":{"type":"string"}}}"#),
+        sort_order: 16,
+    },
+    HintTypeSeed {
+        code: "camera_gen3",
+        title: "Camera Gen 3",
+        display_family: "polygon_fill",
+        schema_json: Some(r#"{"properties":{"category":{"type":"string"}}}"#),
+        sort_order: 17,
+    },
+    HintTypeSeed {
+        code: "camera_gen4",
+        title: "Camera Gen 4",
+        display_family: "polygon_fill",
+        schema_json: Some(r#"{"properties":{"category":{"type":"string"}}}"#),
+        sort_order: 18,
+    },
+    HintTypeSeed {
+        code: "camera_low_cam",
+        title: "Camera Low Cam",
+        display_family: "polygon_fill",
+        schema_json: Some(r#"{"properties":{"category":{"type":"string"}}}"#),
+        sort_order: 19,
+    },
+    HintTypeSeed {
+        code: "camera_shit_cam",
+        title: "Camera Shit Cam",
+        display_family: "polygon_fill",
+        schema_json: Some(r#"{"properties":{"category":{"type":"string"}}}"#),
+        sort_order: 20,
+    },
+    HintTypeSeed {
+        code: "camera_small_cam",
+        title: "Camera Small Cam",
+        display_family: "polygon_fill",
+        schema_json: Some(r#"{"properties":{"category":{"type":"string"}}}"#),
+        sort_order: 21,
+    },
+    HintTypeSeed {
+        code: "camera_trekker_gen2",
+        title: "Camera Trekker Gen2",
+        display_family: "polygon_fill",
+        schema_json: Some(r#"{"properties":{"category":{"type":"string"}}}"#),
+        sort_order: 22,
+    },
+    HintTypeSeed {
+        code: "camera_trekker_gen3",
+        title: "Camera Trekker Gen3",
+        display_family: "polygon_fill",
+        schema_json: Some(r#"{"properties":{"category":{"type":"string"}}}"#),
+        sort_order: 23,
+    },
+    HintTypeSeed {
+        code: "camera_trekker_gen4",
+        title: "Camera Trekker Gen4",
+        display_family: "polygon_fill",
+        schema_json: Some(r#"{"properties":{"category":{"type":"string"}}}"#),
+        sort_order: 24,
+    },
+    HintTypeSeed {
+        code: "camera_gens_tag",
+        title: "Camera Gens Tag",
+        display_family: "text",
+        schema_json: Some(
+            r#"{"properties":{"tags":{"type":"array","items":{"type":"string"}},"count":{"type":"number"}}}"#,
+        ),
+        sort_order: 25,
+    },
+    HintTypeSeed {
+        code: "snow_outdoor",
+        title: "Snow Outdoor",
+        display_family: "polygon_fill",
+        schema_json: Some(r#"{"properties":{"mode":{"type":"string","enum":["outdoor"]}}}"#),
+        sort_order: 26,
+    },
+    HintTypeSeed {
+        code: "snow_indoor",
+        title: "Snow Indoor",
+        display_family: "polygon_fill",
+        schema_json: Some(r#"{"properties":{"mode":{"type":"string","enum":["indoor"]}}}"#),
+        sort_order: 27,
+    },
 ];
 
 /// Seed built-in hint types. Idempotent — uses INSERT OR IGNORE per type,
@@ -156,15 +249,16 @@ pub fn seed(conn: &Connection) -> Result<usize, String> {
         count += changed;
     }
 
-    // Deprecation policy: Survey Car Type is removed as a standalone layer.
+    // Deprecation policy: legacy camera-generation aggregate and Survey Car Type
+    // are removed as standalone layers.
     conn.execute(
         "UPDATE hint_type
          SET is_active = 0
-         WHERE code = 'car_type'
+         WHERE code IN ('car_type', 'camera_generation')
            AND is_active <> 0",
         [],
     )
-    .map_err(|e| format!("Failed to deactivate hint_type car_type: {}", e))?;
+    .map_err(|e| format!("Failed to deactivate deprecated hint types: {}", e))?;
 
     Ok(count)
 }
