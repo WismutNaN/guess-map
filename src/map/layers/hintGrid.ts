@@ -142,6 +142,8 @@ interface GridState {
   rawByType: Map<string, FC>;
   hiddenCodes: Set<string>;
   sizeScale: number;
+  minConfidence: number;
+  presentationMode: "icons_only" | "icons_text" | "icons_thumbnails";
 }
 
 // ---------------------------------------------------------------------------
@@ -657,11 +659,40 @@ function buildMergedData(state: GridState): FC {
   return { type: "FeatureCollection", features };
 }
 
-function preloadImages(map: maplibregl.Map, fc: FC) {
-  for (const f of fc.features) {
-    const id = norm(f.properties?.icon_image_id);
-    if (id) void ensureCardImage(map, id);
+function buildGridFilter(
+  minConfidence: number,
+  presentationMode: "icons_only" | "icons_text" | "icons_thumbnails",
+): maplibregl.FilterSpecification | null {
+  const clauses: maplibregl.FilterSpecification[] = [];
+
+  if (minConfidence > 0) {
+    clauses.push([
+      ">=",
+      ["coalesce", ["get", "confidence"], 0],
+      minConfidence,
+    ] as maplibregl.FilterSpecification);
   }
+
+  if (presentationMode === "icons_thumbnails") {
+    clauses.push([
+      "any",
+      ["has", "icon_asset_id"],
+      ["has", "image_asset_id"],
+      ["has", "grouped_asset_ids"],
+    ] as maplibregl.FilterSpecification);
+  }
+
+  if (clauses.length === 0) return null;
+  if (clauses.length === 1) return clauses[0];
+  return ["all", ...clauses] as maplibregl.FilterSpecification;
+}
+
+function applyGridFilter(map: maplibregl.Map, state: GridState): void {
+  if (!map.getLayer(LAYER_ID)) return;
+  map.setFilter(
+    LAYER_ID,
+    buildGridFilter(state.minConfidence, state.presentationMode),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -857,12 +888,13 @@ export async function addHintGridLayer(
     rawByType,
     hiddenCodes: new Set(),
     sizeScale: DEFAULT_GRID_SIZE_SCALE,
+    minConfidence: 0,
+    presentationMode: "icons_text",
   };
   stateByMap.set(map, state);
 
   bindMissingHandler(map);
   const merged = buildMergedData(state);
-  preloadImages(map, merged);
 
   if (!map.getSource(SOURCE_ID)) {
     map.addSource(SOURCE_ID, { type: "geojson", data: merged });
@@ -903,6 +935,8 @@ export async function addHintGridLayer(
     });
   }
 
+  applyGridFilter(map, state);
+
   // Register each type in layerManager with EMPTY layer list —
   // actual visibility is handled by re-filtering source data.
   for (const code of types.keys()) {
@@ -924,6 +958,10 @@ export function setHintGridTypeVisibility(
 ): void {
   const state = stateByMap.get(map);
   if (!state || !state.types.has(code)) return;
+  const currentlyVisible = !state.hiddenCodes.has(code);
+  if (currentlyVisible === visible) {
+    return;
+  }
 
   if (visible) {
     state.hiddenCodes.delete(code);
@@ -969,7 +1007,6 @@ export async function refreshHintGridType(
   state.rawByType.set(code, data);
 
   const merged = buildMergedData(state);
-  preloadImages(map, merged);
 
   const source = map.getSource(SOURCE_ID) as
     | maplibregl.GeoJSONSource
@@ -995,7 +1032,6 @@ export async function refreshHintGrid(
   }
 
   const merged = buildMergedData(state);
-  preloadImages(map, merged);
 
   const source = map.getSource(SOURCE_ID) as
     | maplibregl.GeoJSONSource
@@ -1024,15 +1060,19 @@ export function setHintGridMinConfidence(
   map: maplibregl.Map,
   minConfidence: number,
 ): void {
-  if (!map.getLayer(LAYER_ID)) return;
-  const n = Math.max(0, Math.min(1, minConfidence));
-  if (n <= 0) {
-    map.setFilter(LAYER_ID, null);
-  } else {
-    map.setFilter(LAYER_ID, [
-      ">=",
-      ["coalesce", ["get", "confidence"], 0],
-      n,
-    ] as maplibregl.FilterSpecification);
-  }
+  const state = stateByMap.get(map);
+  if (!state) return;
+  state.minConfidence = Math.max(0, Math.min(1, minConfidence));
+  applyGridFilter(map, state);
+}
+
+/** Apply presentation mode-specific filtering for grid symbols. */
+export function setHintGridPresentationMode(
+  map: maplibregl.Map,
+  mode: "icons_only" | "icons_text" | "icons_thumbnails",
+): void {
+  const state = stateByMap.get(map);
+  if (!state) return;
+  state.presentationMode = mode;
+  applyGridFilter(map, state);
 }

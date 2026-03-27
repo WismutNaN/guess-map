@@ -21,7 +21,7 @@ function setupInvokeMocks() {
         is_active: true,
       },
     ],
-    { note: 3 }
+    { note: 3 },
   );
 }
 
@@ -35,17 +35,16 @@ function setupInvokeMocksWithData(
     sort_order: number;
     is_active: boolean;
   }>,
-  counts: Record<string, number>
+  counts: Record<string, number>,
 ) {
-  invokeMock.mockImplementation((command: string) => {
-    if (command === "get_hint_types") {
-      return Promise.resolve(hintTypes);
+  invokeMock.mockImplementation((command: string, args?: Record<string, unknown>) => {
+    if (command === "get_hint_types") return Promise.resolve(hintTypes);
+    if (command === "get_hint_counts") return Promise.resolve(counts);
+    if (command === "get_setting_or") {
+      // Return empty defaults for all settings
+      return Promise.resolve((args as { default?: string })?.default ?? "");
     }
-
-    if (command === "get_hint_counts") {
-      return Promise.resolve(counts);
-    }
-
+    if (command === "set_setting") return Promise.resolve(null);
     return Promise.resolve(null);
   });
 }
@@ -59,7 +58,7 @@ describe("LayerPanel overlays", () => {
   it("keeps overlay visibility state across refreshSignal updates", async () => {
     const onToggle = vi.fn();
     const { rerender } = render(
-      <LayerPanel onToggle={onToggle} refreshSignal={0} />
+      <LayerPanel onToggle={onToggle} refreshSignal={0} />,
     );
 
     const coverageCheckbox = await screen.findByLabelText(/GSV Coverage/i);
@@ -74,7 +73,7 @@ describe("LayerPanel overlays", () => {
       expect(screen.getByLabelText(/GSV Coverage/i)).toBeChecked();
     });
 
-    expect(onToggle).toHaveBeenLastCalledWith("routes", false);
+    expect(onToggle).toHaveBeenLastCalledWith("gsv_coverage", true);
     expect(onToggle).toHaveBeenCalledWith("gsv_coverage", true);
   });
 
@@ -87,7 +86,7 @@ describe("LayerPanel overlays", () => {
         onToggle={onToggle}
         onCoverageOpacityChange={onCoverageOpacityChange}
         coverageOpacity={DEFAULT_COVERAGE_OPACITY}
-      />
+      />,
     );
 
     const coverageCheckbox = await screen.findByLabelText(/GSV Coverage/i);
@@ -121,18 +120,22 @@ describe("LayerPanel overlays", () => {
           is_active: true,
         },
       ],
-      { note: 3, coverage: 9 }
+      { note: 3, coverage: 9 },
     );
 
     render(<LayerPanel onToggle={vi.fn()} />);
 
-    expect(await screen.findByLabelText(/GSV Coverage/i)).toBeInTheDocument();
-    expect(screen.queryByLabelText(/^Coverage$/i)).toBeNull();
+    // GSV Coverage overlay should be present
     expect(
-      await screen.findByText(
-        (content, element) =>
-          content === "Note" && element?.classList.contains("layer-item-title") === true
-      )
+      await screen.findByLabelText(/GSV Coverage/i),
+    ).toBeInTheDocument();
+    // The raw "Coverage" hint type should NOT appear
+    expect(screen.queryByLabelText(/^Coverage$/i)).toBeNull();
+
+    // "Note" is inside the "Text & Scripts" group.
+    // The group header should be rendered.
+    expect(
+      await screen.findByText("Text & Scripts"),
     ).toBeInTheDocument();
   });
 });

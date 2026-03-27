@@ -61,6 +61,8 @@ export interface LayerState {
 
   /** Call after a hint is created/updated/deleted to refresh the map layer */
   onHintChanged: (hintTypeCode: string) => void;
+  /** Bump UI refresh counters after external mutations without forcing map refresh. */
+  notifyDataChanged: () => void;
   /** Initialize map-dependent layer state (call once on map ready) */
   initMap: (map: maplibregl.Map) => void;
   /** Bind to selectedCountryCode changes for routes filter */
@@ -116,9 +118,8 @@ export function useLayerState(): LayerState {
       if (isHintGridCode(mapRef.current, code)) {
         setHintGridTypeVisibility(mapRef.current, code, visible);
       }
-      applyDisplaySettingsToMap(mapRef.current);
     }
-  }, [applyDisplaySettingsToMap]);
+  }, []);
 
   const handleCoverageOpacity = useCallback((opacity: number) => {
     setCoverageOpacityVal(opacity);
@@ -284,6 +285,7 @@ export function useLayerState(): LayerState {
     setRoutesFilterMode,
     toggleLayer,
     onHintChanged,
+    notifyDataChanged: bumpRefresh,
     initMap,
     syncRoutesFilter,
     clearMap,

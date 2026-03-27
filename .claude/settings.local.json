@@ -36,7 +36,10 @@
       "Bash(node scripts/gm-agent.mjs)",
       "Bash(GM_API_TOKEN=test node scripts/gm-agent.mjs help)",
       "Bash(npm run:*)",
-      "Bash(npm test:*)"
+      "Bash(npm test:*)",
+      "Bash(find V:guess-mapsrccomponents -type f -name *.css)",
+      "Bash(find V:guess-map -name *.css -type f)",
+      "Bash(npx vitest:*)"
     ]
   }
 }

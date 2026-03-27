@@ -4,6 +4,7 @@ import {
   DENSITY_PRESETS,
   type DensityPresetId,
 } from "./presets";
+import { setHintGridPresentationMode } from "./layers/hintGrid";
 
 export type PresentationMode = "icons_only" | "icons_text" | "icons_thumbnails";
 
@@ -89,6 +90,7 @@ export function applyPresentationMode(
   // Unified hint grid
   if (map.getLayer(HINT_GRID_LAYER_ID)) {
     map.setLayoutProperty(HINT_GRID_LAYER_ID, "text-field", textFieldForMode);
+    setHintGridPresentationMode(map, mode);
   }
 
   if (map.getLayer(NOTE_LAYER_ID)) {

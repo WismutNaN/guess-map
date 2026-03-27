@@ -48,9 +48,14 @@ export function bindRegionSelection(
       return;
     }
 
+    const interactiveLayers = getInteractiveLayers(map);
+    if (interactiveLayers.length === 0) {
+      return;
+    }
+
     const withModifier = event.originalEvent.ctrlKey || event.originalEvent.metaKey;
     const features = map.queryRenderedFeatures(event.point, {
-      layers: [...INTERACTIVE_LAYERS],
+      layers: interactiveLayers,
     });
 
     if (features.length === 0) {
@@ -162,8 +167,14 @@ export function bindRegionSelection(
         [minX, minY],
         [maxX, maxY],
       ];
+      const interactiveLayers = getInteractiveLayers(map);
+      if (interactiveLayers.length === 0) {
+        suppressNextClick = true;
+        cleanupLasso();
+        return;
+      }
       const features = map.queryRenderedFeatures(bbox, {
-        layers: [...INTERACTIVE_LAYERS],
+        layers: interactiveLayers,
       });
 
       suppressNextClick = true;
@@ -195,6 +206,10 @@ export function bindRegionSelection(
     map.off("click", onClick);
     map.off("mousedown", onMouseDown);
   };
+}
+
+function getInteractiveLayers(map: maplibregl.Map): string[] {
+  return INTERACTIVE_LAYERS.filter((layerId) => Boolean(map.getLayer(layerId)));
 }
 
 function mergeRegionLists(current: RegionInfo[], next: RegionInfo[]) {

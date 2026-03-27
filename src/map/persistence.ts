@@ -163,3 +163,43 @@ export function saveDisplaySettings(settings: DisplaySettings) {
     }
   }, 400);
 }
+
+// ---------------------------------------------------------------------------
+// Layer visibility persistence
+// ---------------------------------------------------------------------------
+
+let layerVisSaveTimeout: ReturnType<typeof setTimeout> | null = null;
+
+export async function loadLayerVisibility(): Promise<Record<string, boolean>> {
+  try {
+    const raw = await invoke<string>("get_setting_or", {
+      key: "map.layer_visibility",
+      default: "{}",
+    });
+    const parsed = JSON.parse(raw);
+    if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+      const result: Record<string, boolean> = {};
+      for (const [k, v] of Object.entries(parsed)) {
+        if (typeof v === "boolean") result[k] = v;
+      }
+      return result;
+    }
+  } catch (e) {
+    console.warn("Failed to load layer visibility:", e);
+  }
+  return {};
+}
+
+export function saveLayerVisibility(visibility: Record<string, boolean>) {
+  if (layerVisSaveTimeout) clearTimeout(layerVisSaveTimeout);
+  layerVisSaveTimeout = setTimeout(async () => {
+    try {
+      await invoke("set_setting", {
+        key: "map.layer_visibility",
+        value: JSON.stringify(visibility),
+      });
+    } catch (error) {
+      console.warn("Failed to save layer visibility:", error);
+    }
+  }, 600);
+}

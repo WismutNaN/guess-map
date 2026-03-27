@@ -1,12 +1,151 @@
 use rusqlite::Connection;
 use serde_json::{json, Value};
 use std::collections::HashMap;
+use std::path::Path;
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex, OnceLock};
+use std::time::UNIX_EPOCH;
+
+#[derive(Clone)]
+struct LayerCacheEntry {
+    signature: String,
+    geojson: String,
+}
+
+#[derive(Clone)]
+struct RouteGeometryCacheEntry {
+    signature: String,
+    geometries: Arc<HashMap<String, Value>>,
+}
+
+fn point_layer_cache() -> &'static Mutex<HashMap<String, LayerCacheEntry>> {
+    static CACHE: OnceLock<Mutex<HashMap<String, LayerCacheEntry>>> = OnceLock::new();
+    CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn line_layer_cache() -> &'static Mutex<HashMap<String, LayerCacheEntry>> {
+    static CACHE: OnceLock<Mutex<HashMap<String, LayerCacheEntry>>> = OnceLock::new();
+    CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn route_geometry_cache() -> &'static Mutex<Option<RouteGeometryCacheEntry>> {
+    static CACHE: OnceLock<Mutex<Option<RouteGeometryCacheEntry>>> = OnceLock::new();
+    CACHE.get_or_init(|| Mutex::new(None))
+}
+
+fn cache_lookup(
+    cache: &Mutex<HashMap<String, LayerCacheEntry>>,
+    key: &str,
+    signature: &str,
+) -> Option<String> {
+    let guard = cache.lock().ok()?;
+    let entry = guard.get(key)?;
+    if entry.signature == signature {
+        Some(entry.geojson.clone())
+    } else {
+        None
+    }
+}
+
+fn cache_store(
+    cache: &Mutex<HashMap<String, LayerCacheEntry>>,
+    key: &str,
+    signature: &str,
+    geojson: &str,
+) {
+    if let Ok(mut guard) = cache.lock() {
+        guard.insert(
+            key.to_string(),
+            LayerCacheEntry {
+                signature: signature.to_string(),
+                geojson: geojson.to_string(),
+            },
+        );
+    }
+}
+
+fn point_layer_signature(conn: &Connection, hint_type_code: &str) -> Result<String, String> {
+    let (count, max_updated, max_created): (i64, Option<String>, Option<String>) = conn
+        .query_row(
+            "SELECT COUNT(*),
+                    MAX(rh.updated_at),
+                    MAX(rh.created_at)
+             FROM region_hint rh
+             JOIN region r ON rh.region_id = r.id
+             JOIN hint_type ht ON rh.hint_type_id = ht.id
+             WHERE ht.code = ?1 AND rh.is_visible = 1 AND r.is_active = 1",
+            [hint_type_code],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )
+        .map_err(|e| e.to_string())?;
+
+    Ok(format!(
+        "{}|{}|{}",
+        count,
+        max_updated.unwrap_or_default(),
+        max_created.unwrap_or_default()
+    ))
+}
+
+fn route_file_signature(path: &Path) -> Result<String, String> {
+    let metadata = std::fs::metadata(path).map_err(|e| {
+        format!(
+            "Failed to read routes metadata at {}: {}",
+            path.display(),
+            e
+        )
+    })?;
+    let modified = metadata
+        .modified()
+        .ok()
+        .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
+        .map(|d| d.as_millis())
+        .unwrap_or(0);
+    Ok(format!(
+        "{}|{}|{}",
+        path.display(),
+        metadata.len(),
+        modified
+    ))
+}
+
+fn line_layer_signature(conn: &Connection, hint_type_code: &str) -> Result<String, String> {
+    let (count, max_updated, max_created): (i64, Option<String>, Option<String>) = conn
+        .query_row(
+            "SELECT COUNT(*),
+                    MAX(rh.updated_at),
+                    MAX(rh.created_at)
+             FROM region_hint rh
+             JOIN region r ON rh.region_id = r.id
+             JOIN hint_type ht ON rh.hint_type_id = ht.id
+             WHERE ht.code = ?1
+               AND rh.is_visible = 1
+               AND r.is_active = 1
+               AND r.region_level = 'route'",
+            [hint_type_code],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )
+        .map_err(|e| e.to_string())?;
+
+    let route_sig = route_file_signature(&resolve_routes_geojson_path(conn))?;
+    Ok(format!(
+        "{}|{}|{}|{}",
+        count,
+        max_updated.unwrap_or_default(),
+        max_created.unwrap_or_default(),
+        route_sig
+    ))
+}
 
 /// Compile point GeoJSON for a given hint_type code.
 /// Joins region_hint with region to get anchor coordinates.
 /// Returns a GeoJSON FeatureCollection string.
 pub fn compile_point_layer(conn: &Connection, hint_type_code: &str) -> Result<String, String> {
+    let signature = point_layer_signature(conn, hint_type_code)?;
+    if let Some(cached) = cache_lookup(point_layer_cache(), hint_type_code, &signature) {
+        return Ok(cached);
+    }
+
     let mut stmt = conn
         .prepare(
             "SELECT rh.id, rh.short_value, rh.full_value, rh.data_json, rh.color,
@@ -83,7 +222,9 @@ pub fn compile_point_layer(conn: &Connection, hint_type_code: &str) -> Result<St
         "features": features
     });
 
-    serde_json::to_string(&fc).map_err(|e| e.to_string())
+    let geojson = serde_json::to_string(&fc).map_err(|e| e.to_string())?;
+    cache_store(point_layer_cache(), hint_type_code, &signature, &geojson);
+    Ok(geojson)
 }
 
 /// Compile polygon enrichment data for a given hint_type code.
@@ -136,6 +277,11 @@ pub fn compile_polygon_enrichment(
 /// Compile line GeoJSON for a given hint_type code.
 /// Uses route geometries referenced by region.geometry_ref = "routes:<route_id>".
 pub fn compile_line_layer(conn: &Connection, hint_type_code: &str) -> Result<String, String> {
+    let signature = line_layer_signature(conn, hint_type_code)?;
+    if let Some(cached) = cache_lookup(line_layer_cache(), hint_type_code, &signature) {
+        return Ok(cached);
+    }
+
     let route_geometries = load_route_geometry_map(conn)?;
 
     let mut stmt = conn
@@ -242,11 +388,23 @@ pub fn compile_line_layer(conn: &Connection, hint_type_code: &str) -> Result<Str
         "features": features
     });
 
-    serde_json::to_string(&fc).map_err(|e| e.to_string())
+    let geojson = serde_json::to_string(&fc).map_err(|e| e.to_string())?;
+    cache_store(line_layer_cache(), hint_type_code, &signature, &geojson);
+    Ok(geojson)
 }
 
-fn load_route_geometry_map(conn: &Connection) -> Result<HashMap<String, Value>, String> {
+fn load_route_geometry_map(conn: &Connection) -> Result<Arc<HashMap<String, Value>>, String> {
     let routes_path = resolve_routes_geojson_path(conn);
+    let signature = route_file_signature(&routes_path)?;
+
+    if let Ok(cache_guard) = route_geometry_cache().lock() {
+        if let Some(entry) = cache_guard.as_ref() {
+            if entry.signature == signature {
+                return Ok(Arc::clone(&entry.geometries));
+            }
+        }
+    }
+
     let json_str = std::fs::read_to_string(&routes_path).map_err(|e| {
         format!(
             "Failed to read routes GeoJSON at {}: {}",
@@ -279,7 +437,15 @@ fn load_route_geometry_map(conn: &Connection) -> Result<HashMap<String, Value>, 
         }
     }
 
-    Ok(map)
+    let geometries = Arc::new(map);
+    if let Ok(mut cache_guard) = route_geometry_cache().lock() {
+        *cache_guard = Some(RouteGeometryCacheEntry {
+            signature,
+            geometries: Arc::clone(&geometries),
+        });
+    }
+
+    Ok(geometries)
 }
 
 fn resolve_routes_geojson_path(conn: &Connection) -> PathBuf {

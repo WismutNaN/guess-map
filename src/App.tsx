@@ -51,12 +51,12 @@ function App() {
     layers.syncRoutesFilter(selection.selectedCountryCode);
   }, [layers.syncRoutesFilter, mode, selection.selectedCountryCode]);
 
-  // Clear map refs while map view is hidden.
   useEffect(() => {
-    if (mode !== "assets") return;
-    mapRef.current = null;
-    layers.clearMap();
-  }, [layers.clearMap, mode]);
+    if (mode === "assets") {
+      return;
+    }
+    mapRef.current?.resize();
+  }, [mode]);
 
   // Handle map ready
   const handleMapReady = useCallback(
@@ -107,13 +107,13 @@ function App() {
           void refreshHintTypeOnMap(map, code).catch(console.error);
         }
       }
-      layers.onHintChanged(codes[0] ?? "");
+      layers.notifyDataChanged();
     }).then((dispose) => {
       unlisten = dispose;
     });
 
     return () => unlisten?.();
-  }, [layers.onHintChanged]);
+  }, [layers.notifyDataChanged]);
 
   return (
     <div className="app">
@@ -130,9 +130,7 @@ function App() {
       />
 
       <div className="map-wrapper">
-        {mode === "assets" ? (
-          <AssetLibrary />
-        ) : (
+        <div className={`map-shell${mode === "assets" ? " map-shell-hidden" : ""}`}>
           <MapView
             editorMode={mode === "editor"}
             selectedRegions={selection.regions}
@@ -140,7 +138,8 @@ function App() {
             onZoomChange={setZoom}
             onMapReady={handleMapReady}
           />
-        )}
+        </div>
+        {mode === "assets" && <AssetLibrary />}
       </div>
 
       {mode !== "assets" && (

@@ -31,6 +31,18 @@ body {
   overflow: hidden;
 }
 
+.map-shell {
+  width: 100%;
+  height: 100%;
+}
+
+.map-shell-hidden {
+  position: absolute;
+  inset: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .map-container {
   width: 100%;
   height: 100%;
@@ -368,6 +380,10 @@ body {
 
 .layer-panel-body {
   padding: 6px 0;
+  max-height: calc(100vh - 140px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #3a4570 transparent;
 }
 
 .layer-item {
@@ -399,6 +415,68 @@ body {
 
 .layer-item-empty {
   opacity: 0.45;
+}
+
+/* Layer groups */
+.layer-group {
+  margin-bottom: 1px;
+}
+
+.layer-group-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.12s;
+}
+
+.layer-group-header:hover {
+  background: rgba(90, 104, 165, 0.15);
+}
+
+.layer-group-arrow {
+  display: inline-block;
+  font-size: 10px;
+  color: #7983aa;
+  width: 12px;
+  text-align: center;
+  transition: transform 0.15s;
+  flex-shrink: 0;
+}
+
+.layer-group-arrow.expanded {
+  transform: rotate(90deg);
+}
+
+.layer-group-checkbox {
+  accent-color: #7fa2ff;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.layer-group-label {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 600;
+  color: #c0caef;
+}
+
+.layer-group-count {
+  font-size: 10px;
+  color: #6b7ab0;
+  min-width: 28px;
+  text-align: right;
+}
+
+.layer-group-body .layer-item {
+  padding-left: 38px;
+  font-size: 12px;
+}
+
+.layer-section-label-sub {
+  padding-top: 8px;
 }
 
 .layer-section-label {
