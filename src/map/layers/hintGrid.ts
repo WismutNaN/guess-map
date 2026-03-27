@@ -154,6 +154,12 @@ const stateByMap = new WeakMap<maplibregl.Map, GridState>();
 const cardDescriptors = new Map<string, CardDescriptor>();
 const loadsInFlight = new Map<string, Promise<void>>();
 const handlerBound = new WeakSet<maplibregl.Map>();
+const viewportWarmupBound = new WeakSet<maplibregl.Map>();
+const viewportWarmupScheduled = new WeakSet<maplibregl.Map>();
+const VIEWPORT_WARMUP_IMAGE_LIMIT = 120;
+const MAX_IMAGE_LOAD_CONCURRENCY = 3;
+let activeImageLoads = 0;
+const imageLoadWaiters: Array<() => void> = [];
 
 // ---------------------------------------------------------------------------
 // Small helpers
@@ -530,7 +536,7 @@ async function ensureCardImage(
   const existing = loadsInFlight.get(imageId);
   if (existing) return existing;
 
-  const promise = (async () => {
+  const promise = runWithImageLoadSlot(async () => {
     if (desc.kind === "asset" && desc.assetId) {
       const dataUrl = await invoke<string>("get_asset_data_url", {
         assetId: desc.assetId,
@@ -545,7 +551,10 @@ async function ensureCardImage(
           subtitle: desc.subtitle,
         }),
       );
-    } else if (
+      return;
+    }
+
+    if (
       desc.kind === "asset_grid" &&
       desc.assetIds &&
       desc.assetIds.length > 0
@@ -569,23 +578,41 @@ async function ensureCardImage(
           totalCount: desc.totalCount,
         }),
       );
-    } else {
-      setHintCardImage(
-        map,
-        imageId,
-        createHintTextCard({
-          hintCode: desc.hintCode,
-          tag: desc.tag,
-          text: desc.text ?? "",
-        }),
-      );
+      return;
     }
-  })()
+
+    setHintCardImage(
+      map,
+      imageId,
+      createHintTextCard({
+        hintCode: desc.hintCode,
+        tag: desc.tag,
+        text: desc.text ?? "",
+      }),
+    );
+  })
     .catch((e) => console.warn(`[HintGrid] load ${imageId}:`, e))
     .finally(() => loadsInFlight.delete(imageId));
 
   loadsInFlight.set(imageId, promise);
   return promise;
+}
+
+async function runWithImageLoadSlot<T>(task: () => Promise<T>): Promise<T> {
+  if (activeImageLoads >= MAX_IMAGE_LOAD_CONCURRENCY) {
+    await new Promise<void>((resolve) => {
+      imageLoadWaiters.push(resolve);
+    });
+  }
+
+  activeImageLoads += 1;
+  try {
+    return await task();
+  } finally {
+    activeImageLoads = Math.max(0, activeImageLoads - 1);
+    const resume = imageLoadWaiters.shift();
+    resume?.();
+  }
 }
 
 function bindMissingHandler(map: maplibregl.Map) {
@@ -595,6 +622,65 @@ function bindMissingHandler(map: maplibregl.Map) {
     if (id?.startsWith(IMAGE_PREFIX)) void ensureCardImage(map, id);
   });
   handlerBound.add(map);
+}
+
+function warmupVisibleImages(map: maplibregl.Map): void {
+  if (!map.getLayer(LAYER_ID)) return;
+  const features = map.querySourceFeatures(SOURCE_ID);
+  const seen = new Set<string>();
+  let queued = 0;
+
+  for (const feature of features) {
+    const id = norm((feature.properties as Props | undefined)?.icon_image_id);
+    if (!id || seen.has(id)) {
+      continue;
+    }
+    seen.add(id);
+    void ensureCardImage(map, id);
+    queued += 1;
+    if (queued >= VIEWPORT_WARMUP_IMAGE_LIMIT) {
+      return;
+    }
+  }
+
+  // Fallback: if source query returned nothing, try rendered features.
+  const rendered = map.queryRenderedFeatures(undefined, {
+    layers: [LAYER_ID],
+  });
+  for (const feature of rendered) {
+    const id = norm((feature.properties as Props | undefined)?.icon_image_id);
+    if (!id || seen.has(id)) {
+      continue;
+    }
+    seen.add(id);
+    void ensureCardImage(map, id);
+    queued += 1;
+    if (queued >= VIEWPORT_WARMUP_IMAGE_LIMIT) {
+      return;
+    }
+  }
+}
+
+function scheduleViewportWarmup(map: maplibregl.Map): void {
+  if (viewportWarmupScheduled.has(map)) {
+    return;
+  }
+  viewportWarmupScheduled.add(map);
+  setTimeout(() => {
+    viewportWarmupScheduled.delete(map);
+    warmupVisibleImages(map);
+  }, 0);
+}
+
+function bindViewportWarmup(map: maplibregl.Map): void {
+  if (viewportWarmupBound.has(map)) {
+    return;
+  }
+  const warmup = () => scheduleViewportWarmup(map);
+  map.on("moveend", warmup);
+  map.on("zoomend", warmup);
+  map.on("idle", warmup);
+  viewportWarmupBound.add(map);
 }
 
 // ---------------------------------------------------------------------------
@@ -894,6 +980,7 @@ export async function addHintGridLayer(
   stateByMap.set(map, state);
 
   bindMissingHandler(map);
+  bindViewportWarmup(map);
   const merged = buildMergedData(state);
 
   if (!map.getSource(SOURCE_ID)) {
@@ -936,6 +1023,7 @@ export async function addHintGridLayer(
   }
 
   applyGridFilter(map, state);
+  scheduleViewportWarmup(map);
 
   // Register each type in layerManager with EMPTY layer list —
   // actual visibility is handled by re-filtering source data.
@@ -974,6 +1062,7 @@ export function setHintGridTypeVisibility(
     | maplibregl.GeoJSONSource
     | undefined;
   if (source) source.setData(merged);
+  scheduleViewportWarmup(map);
 }
 
 /** Returns true if the given hint type code is managed by the grid. */
@@ -1012,6 +1101,7 @@ export async function refreshHintGridType(
     | maplibregl.GeoJSONSource
     | undefined;
   if (source) source.setData(merged);
+  scheduleViewportWarmup(map);
   return true;
 }
 
@@ -1037,6 +1127,7 @@ export async function refreshHintGrid(
     | maplibregl.GeoJSONSource
     | undefined;
   if (source) source.setData(merged);
+  scheduleViewportWarmup(map);
 }
 
 /** Adjust the rendered size of grid cards. */
