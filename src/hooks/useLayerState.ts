@@ -73,6 +73,7 @@ export interface LayerState {
 
 export function useLayerState(): LayerState {
   const mapRef = useRef<maplibregl.Map | null>(null);
+  const layerVisibilityRef = useRef<Map<string, boolean>>(new Map());
   const [coverageOpacity, setCoverageOpacityVal] = useState(DEFAULT_COVERAGE_OPACITY);
   const [flagSizeScale, setFlagSizeScaleVal] = useState(DEFAULT_GRID_SIZE_SCALE);
   const [minConfidence, setMinConfidenceVal] = useState(0);
@@ -112,14 +113,21 @@ export function useLayerState(): LayerState {
     [densityPreset, presentationMode, showCollisionBoxes, showTileBoundaries]
   );
 
-  const toggleLayer = useCallback((code: string, visible: boolean) => {
-    if (mapRef.current) {
-      setLayerGroupVisibility(mapRef.current, code, visible);
-      if (isHintGridCode(mapRef.current, code)) {
-        setHintGridTypeVisibility(mapRef.current, code, visible);
+  const applyLayerVisibilityToMap = useCallback(
+    (map: maplibregl.Map, code: string, visible: boolean) => {
+      setLayerGroupVisibility(map, code, visible);
+      if (isHintGridCode(map, code)) {
+        setHintGridTypeVisibility(map, code, visible);
       }
-    }
-  }, []);
+    },
+    []
+  );
+
+  const toggleLayer = useCallback((code: string, visible: boolean) => {
+    layerVisibilityRef.current.set(code, visible);
+    if (!mapRef.current) return;
+    applyLayerVisibilityToMap(mapRef.current, code, visible);
+  }, [applyLayerVisibilityToMap]);
 
   const handleCoverageOpacity = useCallback((opacity: number) => {
     setCoverageOpacityVal(opacity);
@@ -154,9 +162,13 @@ export function useLayerState(): LayerState {
       setHintGridSizeScale(map, flagSizeScale);
 
       applyDisplaySettingsToMap(map);
+      for (const [code, visible] of layerVisibilityRef.current) {
+        applyLayerVisibilityToMap(map, code, visible);
+      }
       setRefreshSignal((v) => v + 1);
     },
     [
+      applyLayerVisibilityToMap,
       applyDisplaySettingsToMap,
       coverageOpacity,
       flagSizeScale,
