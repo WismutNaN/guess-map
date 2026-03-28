@@ -19,7 +19,7 @@ export const LAYER_GROUPS: LayerGroup[] = [
   {
     id: "essentials",
     label: "Essentials",
-    codes: ["flag", "driving_side", "phone_hint", "country_domain"],
+    codes: ["flag", "driving_side", "phone_hint", "country_domain", "region_code"],
     defaultOn: true,
   },
   {

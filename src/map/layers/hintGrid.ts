@@ -32,6 +32,7 @@ const SOURCE_ID = "hint-grid";
 export const LAYER_ID = "hint-grid";
 const IMAGE_PREFIX = "hg:";
 const GAS_STATION_CODE = "gas_station";
+const REGION_CODE_HINT_CODE = "region_code";
 const GAS_STATION_MAX_LOGOS = 12;
 
 /** Horizontal spacing between card centres in icon-offset units. */
@@ -73,6 +74,7 @@ const TYPE_PRIORITY: Record<string, number> = {
   flag: 0,
   phone_hint: 10,
   country_domain: 15,
+  region_code: 16,
   camera_gens_tag: 18,
   script_sample: 20,
   architecture: 25,
@@ -109,6 +111,7 @@ const EXCLUDED_CODES = new Set([
 type Props = GeoJSON.GeoJsonProperties & {
   region_id?: string;
   region_level?: string;
+  region_code?: string;
   hint_type_code?: string;
   short_value?: string;
   full_value?: string;
@@ -233,6 +236,8 @@ function chooseText(p: Props): string | null {
     "prefix",
     "format",
     "generation",
+    "region_code",
+    "regionCode",
     "script_name",
     "route_number",
     "brand",
@@ -268,8 +273,14 @@ function applyImageIds(data: FC, ht: HintTypeInfo): void {
   for (const f of data.features) {
     const p: Props = f.properties ?? {};
     p.hint_type_code = ht.code;
-    const assetId = chooseAssetId(p);
-    const textVal = chooseText(p);
+    const regionCode =
+      norm((p as Record<string, unknown>).region_code) ??
+      norm((p as Record<string, unknown>).regionCode);
+    const assetId = ht.code === REGION_CODE_HINT_CODE ? null : chooseAssetId(p);
+    const textVal =
+      ht.code === REGION_CODE_HINT_CODE
+        ? regionCode ?? chooseText(p)
+        : chooseText(p);
     let imageId: string | null = null;
 
     if (assetId) {
@@ -793,6 +804,7 @@ function buildGridFilter(
       ["has", "icon_asset_id"],
       ["has", "image_asset_id"],
       ["has", "grouped_asset_ids"],
+      ["==", ["get", "hint_type_code"], "region_code"],
     ] as maplibregl.FilterSpecification);
   }
 
@@ -870,13 +882,23 @@ function buildPopupContent(
   badge.textContent = ht?.title ?? hintCode.replace(/_/g, " ");
   header.appendChild(badge);
 
-  const regionName =
-    norm(props.region_name as string) ??
-    norm(props.country_code as string);
-  if (regionName) {
+  const regionName = norm(props.region_name as string) ?? norm(props.country_code as string);
+  const regionCode = norm(props.region_code as string);
+  let regionLabel = regionName;
+  if (!regionLabel && regionCode) {
+    regionLabel = regionCode;
+  } else if (regionLabel && regionCode) {
+    const upperName = regionLabel.toUpperCase();
+    const upperCode = regionCode.toUpperCase();
+    if (!upperName.includes(`[${upperCode}]`)) {
+      regionLabel = `${regionLabel} [${regionCode}]`;
+    }
+  }
+
+  if (regionLabel) {
     const region = document.createElement("span");
     region.className = "hint-grid-popup-region";
-    region.textContent = regionName;
+    region.textContent = regionLabel;
     header.appendChild(region);
   }
   root.appendChild(header);

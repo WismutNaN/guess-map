@@ -59,6 +59,7 @@ const HINT_COLORS: Record<string, string> = {
   bollard: "#ef4444",
   phone_hint: "#0ea5e9",
   country_domain: "#0284c7",
+  region_code: "#0f766e",
   camera_meta: "#2563eb",
   camera_gen1: "#ef4444",
   camera_gen2: "#f97316",

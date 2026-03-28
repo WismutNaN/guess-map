@@ -28,7 +28,7 @@ export function HintForm({ region, initialHint, onCancel, onSaved }: HintFormPro
   useEffect(() => {
     invoke<HintTypeInfo[]>("get_hint_types")
       .then((items) => {
-        const active = items.filter((item) => item.is_active);
+        const active = items.filter((item) => item.is_active && item.code !== "region_code");
         setHintTypes(active);
         if (!initialHint && active.length > 0 && !active.some((h) => h.code === hintTypeCode)) {
           setHintTypeCode(active[0].code);

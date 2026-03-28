@@ -4,6 +4,98 @@ use super::models::{
 use rusqlite::{Connection, OptionalExtension};
 use std::collections::{BTreeSet, HashMap};
 
+const REGION_CODE_HINT_TYPE: &str = "region_code";
+
+fn trailing_bracket_code(value: &str) -> Option<String> {
+    let trimmed = value.trim();
+    if !trimmed.ends_with(']') {
+        return None;
+    }
+    let end = trimmed.rfind(']')?;
+    let start = trimmed[..end].rfind('[')?;
+    let code = trimmed[start + 1..end].trim();
+    if code.is_empty() {
+        None
+    } else {
+        Some(code.to_string())
+    }
+}
+
+fn leading_numeric_code(value: &str) -> Option<String> {
+    let trimmed = value.trim();
+    let mut end = 0usize;
+    for ch in trimmed.chars() {
+        if ch.is_ascii_digit() {
+            end += ch.len_utf8();
+        } else {
+            break;
+        }
+    }
+
+    if end == 0 {
+        return None;
+    }
+
+    let digits = &trimmed[..end];
+    if !(2..=3).contains(&digits.len()) {
+        return None;
+    }
+
+    Some(digits.to_string())
+}
+
+fn derive_region_code(
+    region_level: &str,
+    region_name_en: Option<&str>,
+    geometry_ref: Option<&str>,
+) -> Option<String> {
+    if let Some(name_en) = region_name_en {
+        if let Some(code) = leading_numeric_code(name_en) {
+            return Some(code);
+        }
+        if let Some(code) = trailing_bracket_code(name_en) {
+            return Some(code);
+        }
+    }
+
+    if region_level == "admin1" {
+        return geometry_ref
+            .and_then(|value| value.strip_prefix("admin1:"))
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(ToString::to_string);
+    }
+
+    None
+}
+
+fn count_regions_with_codes(conn: &Connection) -> Result<usize, String> {
+    let mut stmt = conn
+        .prepare(
+            "SELECT region_level, name_en, geometry_ref
+             FROM region
+             WHERE is_active = 1
+               AND region_level = 'admin1'",
+        )
+        .map_err(|e| e.to_string())?;
+
+    let count = stmt
+        .query_map([], |row| {
+            let region_level: String = row.get(0)?;
+            let name_en: Option<String> = row.get(1)?;
+            let geometry_ref: Option<String> = row.get(2)?;
+            Ok((region_level, name_en, geometry_ref))
+        })
+        .map_err(|e| e.to_string())?
+        .filter_map(|r| r.ok())
+        .filter(|(region_level, name_en, geometry_ref)| {
+            derive_region_code(region_level, name_en.as_deref(), geometry_ref.as_deref()).is_some()
+        })
+        .count();
+
+    Ok(count)
+}
+
 pub(crate) fn list_hint_types(conn: &Connection) -> Result<Vec<HintTypeInfo>, String> {
     let mut stmt = conn
         .prepare(
@@ -52,6 +144,13 @@ pub(crate) fn count_hints_by_type(conn: &Connection) -> Result<HashMap<String, u
     .for_each(|(code, count)| {
         counts.insert(code, count);
     });
+
+    if counts.contains_key(REGION_CODE_HINT_TYPE) {
+        counts.insert(
+            REGION_CODE_HINT_TYPE.to_string(),
+            count_regions_with_codes(conn)?,
+        );
+    }
 
     Ok(counts)
 }

@@ -448,6 +448,16 @@ mod tests {
     }
 
     #[test]
+    fn test_count_hints_includes_region_code_virtual_layer() {
+        let conn = setup_conn();
+        let _admin_region = create_admin1(&conn, "IN", "admin1:IN-KA", "Karnataka");
+
+        let counts = repository::count_hints_by_type(&conn).unwrap();
+        let region_code_count = counts.get("region_code").copied().unwrap_or_default();
+        assert!(region_code_count >= 1);
+    }
+
+    #[test]
     fn test_schema_validation_rejects_invalid_enum() {
         let mut conn = setup_conn();
         let region_id = region_id(&conn, "IN");

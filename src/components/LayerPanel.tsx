@@ -65,6 +65,9 @@ export function LayerPanel({
     useState(emptyFilterHintType);
   const [showEmptyRegionsLocal, setShowEmptyRegionsLocal] =
     useState(showEmptyRegions);
+  const emptyFilterHintTypes = hintTypes.filter(
+    (hintType) => hintType.code !== "region_code",
+  );
 
   useEffect(() => {
     setCoverageOpacityLocal(Math.round(coverageOpacity * 100));
@@ -242,7 +245,7 @@ export function LayerPanel({
               }}
             >
               <option value="">Select hint type</option>
-              {hintTypes.map((hintType) => (
+              {emptyFilterHintTypes.map((hintType) => (
                 <option key={hintType.id} value={hintType.code}>
                   {hintType.title}
                 </option>

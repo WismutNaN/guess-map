@@ -82,7 +82,9 @@ export function BulkActions({
     void invoke<HintTypeInfo[]>("get_hint_types")
       .then((types) => {
         if (cancelled) return;
-        const active = types.filter((t) => t.is_active && t.display_family !== "line");
+        const active = types.filter(
+          (t) => t.is_active && t.display_family !== "line" && t.code !== "region_code"
+        );
         setHintTypes(active);
         if (active.length > 0) {
           setHintTypeCode((cur) => cur || active[0].code);
