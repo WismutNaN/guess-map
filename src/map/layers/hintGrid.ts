@@ -602,7 +602,22 @@ async function ensureCardImage(
       }),
     );
   })
-    .catch((e) => console.warn(`[HintGrid] load ${imageId}:`, e))
+    .catch((e) => {
+      console.warn(`[HintGrid] load ${imageId}:`, e);
+      const desc = cardDescriptors.get(imageId);
+      if (!desc) {
+        return;
+      }
+      setHintCardImage(
+        map,
+        imageId,
+        createHintTextCard({
+          hintCode: desc.hintCode,
+          tag: desc.tag,
+          text: desc.text ?? desc.subtitle ?? desc.tag,
+        }),
+      );
+    })
     .finally(() => loadsInFlight.delete(imageId));
 
   loadsInFlight.set(imageId, promise);

@@ -1,7 +1,4 @@
-# Tauri + React + Typescript
-
-This template should help get you started developing with Tauri, React and Typescript in Vite.
-
-## Recommended IDE Setup
-
-- [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+По факту это сборщик и просмоторщик данных для самостоятельного заполнения базы. Но я собрал ручки, чтобы агенты смогли сами искать информацию в интернете и заполнять ее. Я пару сайтов так прогнал и собрал базу с ассетами.
+Она отдельно в релизах лежит, ее вместе с ассетами надо положить в 
+'%AppData%\Roaming\com.wismut.guess-map'
+![](primer.mp4)

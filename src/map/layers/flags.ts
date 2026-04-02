@@ -2,7 +2,7 @@ import maplibregl from "maplibre-gl";
 import { invoke } from "@tauri-apps/api/core";
 import { registerLayerGroup } from "../layerManager";
 import { applySlotLayout, setSlotLayers } from "./slots";
-import { createHintImageCard, setHintCardImage } from "./hintCards";
+import { createHintImageCard, createHintTextCard, setHintCardImage } from "./hintCards";
 
 const SOURCE_ID = "hint-flags";
 const LAYER_ID = "hint-flags";
@@ -153,6 +153,15 @@ async function ensureFlagImage(map: maplibregl.Map, imageId: string): Promise<vo
       console.warn(
         `Failed to load flag card icon ${imageId} (asset ${descriptor.assetId}):`,
         error
+      );
+      setHintCardImage(
+        map,
+        imageId,
+        createHintTextCard({
+          hintCode: "flag",
+          tag: "Flag",
+          text: descriptor.subtitle ?? "Flag",
+        })
       );
     })
     .finally(() => {

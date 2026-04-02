@@ -180,6 +180,21 @@ function makeCanvas(
   return ctx ? { canvas, ctx } : null;
 }
 
+function extractCardImage(
+  ctx: CanvasRenderingContext2D,
+  canvas: HTMLCanvasElement,
+  fallback: HTMLImageElement,
+): ImageData | HTMLImageElement {
+  try {
+    return ctx.getImageData(0, 0, canvas.width, canvas.height);
+  } catch (error) {
+    // Some WebView engines treat SVG-based draws as non-origin-clean and block getImageData.
+    // Fallback to the decoded image element so hints stay visible on map.
+    console.warn("[HintCards] Falling back to source image:", error);
+    return fallback;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Card frame: white fill + thin accent border
 // ---------------------------------------------------------------------------
@@ -458,7 +473,7 @@ export function createHintImageCard(
     drawSubtitle(ctx, subtitle, w, h);
   }
 
-  return ctx.getImageData(0, 0, canvas.width, canvas.height);
+  return extractCardImage(ctx, canvas, source);
 }
 
 // ---------------------------------------------------------------------------
@@ -574,7 +589,7 @@ export function createHintImageGridCard(
     drawSubtitle(ctx, subtitle, w, h);
   }
 
-  return ctx.getImageData(0, 0, canvas.width, canvas.height);
+  return extractCardImage(ctx, canvas, valid[0]);
 }
 
 // ---------------------------------------------------------------------------
