@@ -4,7 +4,7 @@
 
 '%AppData%\Roaming\com.wismut.guess-map'
 
-![видео](primer.mp4)
+![видео](primer.gif)
 
 В базе куча примеров картинок, поэтому она столько вестит
 
