@@ -160,6 +160,7 @@ const handlerBound = new WeakSet<maplibregl.Map>();
 const viewportWarmupBound = new WeakSet<maplibregl.Map>();
 const viewportWarmupScheduled = new WeakSet<maplibregl.Map>();
 const VIEWPORT_WARMUP_IMAGE_LIMIT = 120;
+const MERGED_PRELOAD_BATCH_SIZE = 120;
 const MAX_IMAGE_LOAD_CONCURRENCY = 3;
 let activeImageLoads = 0;
 const imageLoadWaiters: Array<() => void> = [];
@@ -737,6 +738,45 @@ function bindViewportWarmup(map: maplibregl.Map): void {
   viewportWarmupBound.add(map);
 }
 
+function collectMergedImageIds(merged: FC): string[] {
+  const ids = new Set<string>();
+  for (const feature of merged.features) {
+    const id = norm(feature.properties?.icon_image_id);
+    if (!id) {
+      continue;
+    }
+    ids.add(id);
+  }
+  return [...ids];
+}
+
+function enqueueMergedImageLoads(
+  map: maplibregl.Map,
+  merged: FC,
+  batchSize: number = MERGED_PRELOAD_BATCH_SIZE,
+): void {
+  const ids = collectMergedImageIds(merged);
+  if (ids.length === 0) {
+    return;
+  }
+
+  let index = 0;
+  const step = () => {
+    let loaded = 0;
+    while (index < ids.length && loaded < batchSize) {
+      const id = ids[index++];
+      void ensureCardImage(map, id);
+      loaded += 1;
+    }
+
+    if (index < ids.length) {
+      setTimeout(step, 0);
+    }
+  };
+
+  step();
+}
+
 // ---------------------------------------------------------------------------
 // Size expression
 // ---------------------------------------------------------------------------
@@ -1089,6 +1129,7 @@ export async function addHintGridLayer(
 
   applyGridFilter(map, state);
   scheduleViewportWarmup(map);
+  enqueueMergedImageLoads(map, merged);
 
   // Register each type in layerManager with EMPTY layer list —
   // actual visibility is handled by re-filtering source data.
@@ -1128,6 +1169,7 @@ export function setHintGridTypeVisibility(
     | undefined;
   if (source) source.setData(merged);
   scheduleViewportWarmup(map);
+  enqueueMergedImageLoads(map, merged);
 }
 
 /** Returns true if the given hint type code is managed by the grid. */
@@ -1167,6 +1209,7 @@ export async function refreshHintGridType(
     | undefined;
   if (source) source.setData(merged);
   scheduleViewportWarmup(map);
+  enqueueMergedImageLoads(map, merged);
   return true;
 }
 
@@ -1193,6 +1236,7 @@ export async function refreshHintGrid(
     | undefined;
   if (source) source.setData(merged);
   scheduleViewportWarmup(map);
+  enqueueMergedImageLoads(map, merged);
 }
 
 /** Adjust the rendered size of grid cards. */
